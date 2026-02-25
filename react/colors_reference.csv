@@ -1,0 +1,65 @@
+Tema,Nama Warna,OKLCH,Deskripsi
+Light Theme,Primary,oklch(0.45 0.12 145),Hijau tua - tombol utama
+Light Theme,Primary Foreground,oklch(0.99 0 0),Putih - teks di atas primary
+Light Theme,Secondary,oklch(0.96 0.015 85),Kuning pale - background sekunder
+Light Theme,Secondary Foreground,oklch(0.25 0.04 85),Cokelat gelap - teks di atas secondary
+Light Theme,Accent,oklch(0.68 0.15 85),Kuning emas - highlight
+Light Theme,Accent Foreground,oklch(0.18 0.03 85),Cokelat gelap - teks di atas accent
+Light Theme,Background,oklch(0.98 0.008 145),Putih off-white - background utama
+Light Theme,Foreground,oklch(0.18 0.03 145),Hijau sangat gelap - teks utama
+Light Theme,Card,oklch(1 0 0),Putih pure - card backgrounds
+Light Theme,Card Foreground,oklch(0.18 0.03 145),Hijau sangat gelap - teks card
+Light Theme,Popover,oklch(1 0 0),Putih pure - popover backgrounds
+Light Theme,Popover Foreground,oklch(0.18 0.03 145),Hijau sangat gelap - teks popover
+Light Theme,Border,oklch(0.88 0.02 145),Abu-abu terang - garis border
+Light Theme,Input,oklch(0.92 0.01 145),Abu-abu sangat terang - input fields
+Light Theme,Muted,oklch(0.94 0.01 145),Abu-abu pale - warna muted
+Light Theme,Muted Foreground,oklch(0.45 0.03 145),Abu-abu medium - teks muted
+Light Theme,Destructive,oklch(0.55 0.22 25),Merah oranye - danger buttons
+Light Theme,Destructive Foreground,oklch(0.99 0 0),Putih - teks destructive
+Light Theme,Ring,oklch(0.45 0.12 145),Warna focus ring
+Light Theme,Sidebar,oklch(0.22 0.05 145),Hijau sangat gelap - sidebar background
+Light Theme,Sidebar Foreground,oklch(0.95 0.01 145),Putih off-white - teks sidebar
+Light Theme,Sidebar Primary,oklch(0.68 0.15 85),Kuning emas - active state
+Light Theme,Sidebar Primary Foreground,oklch(0.18 0.03 85),Cokelat gelap - teks active
+Light Theme,Sidebar Accent,oklch(0.30 0.05 145),Hijau medium - hover state
+Light Theme,Sidebar Accent Foreground,oklch(0.95 0.01 145),Putih off-white - teks accent
+Light Theme,Sidebar Border,oklch(0.32 0.04 145),Hijau medium gelap - border
+Light Theme,Sidebar Ring,oklch(0.68 0.15 85),Kuning emas - focus ring
+Light Theme,Chart 1,oklch(0.45 0.12 145),Hijau tua - data series 1
+Light Theme,Chart 2,oklch(0.68 0.15 85),Kuning emas - data series 2
+Light Theme,Chart 3,oklch(0.55 0.12 30),Orange-red - data series 3
+Light Theme,Chart 4,oklch(0.50 0.10 200),Biru - data series 4
+Light Theme,Chart 5,oklch(0.60 0.08 50),Orange pale - data series 5
+Dark Theme,Primary,oklch(0.48 0.12 145),Hijau medium - tombol utama
+Dark Theme,Primary Foreground,oklch(0.98 0.02 145),Putih off-white - teks di atas primary
+Dark Theme,Secondary,oklch(0.30 0.03 85),Cokelat gelap - background sekunder
+Dark Theme,Secondary Foreground,oklch(0.90 0.02 85),Kuning pale - teks di atas secondary
+Dark Theme,Accent,oklch(0.40 0.08 85),Kuning tua - highlight
+Dark Theme,Accent Foreground,oklch(0.98 0.02 85),Putih off-white - teks di atas accent
+Dark Theme,Background,oklch(0.20 0.02 260),Hitam gelap - background utama
+Dark Theme,Foreground,oklch(0.95 0.02 260),Putih off-white - teks utama
+Dark Theme,Card,oklch(0.22 0.02 260),Abu-abu gelap - card backgrounds
+Dark Theme,Card Foreground,oklch(0.95 0.02 260),Putih off-white - teks card
+Dark Theme,Popover,oklch(0.22 0.02 260),Abu-abu gelap - popover backgrounds
+Dark Theme,Popover Foreground,oklch(0.95 0.02 260),Putih off-white - teks popover
+Dark Theme,Border,oklch(0.30 0.02 260),Abu-abu medium - garis border
+Dark Theme,Input,oklch(0.26 0.015 260),Abu-abu medium gelap - input fields
+Dark Theme,Muted,oklch(0.32 0.02 260),Abu-abu medium - warna muted
+Dark Theme,Muted Foreground,oklch(0.78 0.02 260),Abu-abu terang - teks muted
+Dark Theme,Destructive,oklch(0.45 0.18 25),Merah medium - danger buttons
+Dark Theme,Destructive Foreground,oklch(0.98 0.02 25),Putih off-white - teks destructive
+Dark Theme,Ring,oklch(0.48 0.10 145),Warna focus ring
+Dark Theme,Sidebar,oklch(0.22 0.03 260),Abu-abu gelap - sidebar background
+Dark Theme,Sidebar Foreground,oklch(0.95 0.02 260),Putih off-white - teks sidebar
+Dark Theme,Sidebar Primary,oklch(0.48 0.12 145),Hijau medium - active state
+Dark Theme,Sidebar Primary Foreground,oklch(0.95 0.02 145),Putih off-white - teks active
+Dark Theme,Sidebar Accent,oklch(0.30 0.03 260),Abu-abu medium - hover state
+Dark Theme,Sidebar Accent Foreground,oklch(0.95 0.02 260),Putih off-white - teks accent
+Dark Theme,Sidebar Border,oklch(0.30 0.02 260),Abu-abu medium - border
+Dark Theme,Sidebar Ring,oklch(0.48 0.10 145),Hijau medium - focus ring
+Dark Theme,Chart 1,oklch(0.48 0.24 264.376),Biru cerah - data series 1
+Dark Theme,Chart 2,oklch(0.70 0.17 162.48),Cyan terah - data series 2
+Dark Theme,Chart 3,oklch(0.77 0.19 70.08),Kuning terang - data series 3
+Dark Theme,Chart 4,oklch(0.63 0.26 303.9),Magenta - data series 4
+Dark Theme,Chart 5,oklch(0.65 0.25 16.439),Red-orange cerah - data series 5

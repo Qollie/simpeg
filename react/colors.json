@@ -1,0 +1,346 @@
+{
+  "metadata": {
+    "name": "Pegawai Dashboard - Color Palette",
+    "description": "Complete color system for Arsip Digital Dashboard",
+    "theme": "Kaltim Inspired - Rainforest Green, Kutai Gold, Natural Earth Tones",
+    "updated": "2026-02-09"
+  },
+  "light": {
+    "primary": {
+      "name": "Primary Green",
+      "oklch": "oklch(0.45 0.12 145)",
+      "hue": 145,
+      "description": "Warna hijau tua untuk tombol utama dan heading penting"
+    },
+    "primary-foreground": {
+      "name": "Primary Foreground",
+      "oklch": "oklch(0.99 0 0)",
+      "description": "Putih untuk teks di atas primary"
+    },
+    "secondary": {
+      "name": "Secondary Cream",
+      "oklch": "oklch(0.96 0.015 85)",
+      "hue": 85,
+      "description": "Kuning pale untuk background sekunder dan input fields"
+    },
+    "secondary-foreground": {
+      "name": "Secondary Brown",
+      "oklch": "oklch(0.25 0.04 85)",
+      "description": "Cokelat gelap untuk teks di atas secondary"
+    },
+    "accent": {
+      "name": "Accent Gold",
+      "oklch": "oklch(0.68 0.15 85)",
+      "hue": 85,
+      "description": "Emas cerah untuk highlight dan accent elements"
+    },
+    "accent-foreground": {
+      "name": "Accent Foreground",
+      "oklch": "oklch(0.18 0.03 85)",
+      "description": "Cokelat gelap untuk teks di atas accent"
+    },
+    "background": {
+      "name": "Background Light",
+      "oklch": "oklch(0.98 0.008 145)",
+      "description": "Putih off-white untuk background utama"
+    },
+    "foreground": {
+      "name": "Foreground Dark",
+      "oklch": "oklch(0.18 0.03 145)",
+      "description": "Hijau sangat gelap untuk teks utama"
+    },
+    "card": {
+      "name": "Card White",
+      "oklch": "oklch(1 0 0)",
+      "description": "Putih pure untuk card backgrounds"
+    },
+    "card-foreground": {
+      "name": "Card Foreground",
+      "oklch": "oklch(0.18 0.03 145)",
+      "description": "Hijau sangat gelap untuk teks card"
+    },
+    "popover": {
+      "name": "Popover White",
+      "oklch": "oklch(1 0 0)",
+      "description": "Putih pure untuk popover backgrounds"
+    },
+    "popover-foreground": {
+      "name": "Popover Foreground",
+      "oklch": "oklch(0.18 0.03 145)",
+      "description": "Hijau sangat gelap untuk teks popover"
+    },
+    "border": {
+      "name": "Border Light Gray",
+      "oklch": "oklch(0.88 0.02 145)",
+      "description": "Abu-abu terang untuk garis border"
+    },
+    "input": {
+      "name": "Input Light",
+      "oklch": "oklch(0.92 0.01 145)",
+      "description": "Abu-abu sangat terang untuk input field backgrounds"
+    },
+    "muted": {
+      "name": "Muted Gray",
+      "oklch": "oklch(0.94 0.01 145)",
+      "description": "Abu-abu pale untuk warna muted/secondary"
+    },
+    "muted-foreground": {
+      "name": "Muted Foreground",
+      "oklch": "oklch(0.45 0.03 145)",
+      "description": "Abu-abu medium untuk teks muted"
+    },
+    "destructive": {
+      "name": "Destructive Red",
+      "oklch": "oklch(0.55 0.22 25)",
+      "hue": 25,
+      "description": "Merah oranye untuk delete dan danger buttons"
+    },
+    "destructive-foreground": {
+      "name": "Destructive Foreground",
+      "oklch": "oklch(0.99 0 0)",
+      "description": "Putih untuk teks destructive"
+    },
+    "ring": {
+      "name": "Ring Focus",
+      "oklch": "oklch(0.45 0.12 145)",
+      "description": "Warna untuk focus ring (sama dengan primary)"
+    },
+    "sidebar": {
+      "name": "Sidebar Dark",
+      "oklch": "oklch(0.22 0.05 145)",
+      "description": "Hijau sangat gelap untuk sidebar background"
+    },
+    "sidebar-foreground": {
+      "name": "Sidebar Text",
+      "oklch": "oklch(0.95 0.01 145)",
+      "description": "Putih off-white untuk teks sidebar"
+    },
+    "sidebar-primary": {
+      "name": "Sidebar Active",
+      "oklch": "oklch(0.68 0.15 85)",
+      "description": "Kuning emas untuk active state sidebar"
+    },
+    "sidebar-primary-foreground": {
+      "name": "Sidebar Active Text",
+      "oklch": "oklch(0.18 0.03 85)",
+      "description": "Cokelat gelap untuk teks active state"
+    },
+    "sidebar-accent": {
+      "name": "Sidebar Hover",
+      "oklch": "oklch(0.30 0.05 145)",
+      "description": "Hijau medium untuk hover state"
+    },
+    "sidebar-accent-foreground": {
+      "name": "Sidebar Accent Text",
+      "oklch": "oklch(0.95 0.01 145)",
+      "description": "Putih off-white untuk teks accent"
+    },
+    "sidebar-border": {
+      "name": "Sidebar Border",
+      "oklch": "oklch(0.32 0.04 145)",
+      "description": "Hijau medium gelap untuk border sidebar"
+    },
+    "sidebar-ring": {
+      "name": "Sidebar Focus Ring",
+      "oklch": "oklch(0.68 0.15 85)",
+      "description": "Kuning emas untuk focus ring sidebar"
+    },
+    "chart-1": {
+      "name": "Chart Series 1",
+      "oklch": "oklch(0.45 0.12 145)",
+      "description": "Hijau tua untuk data series pertama"
+    },
+    "chart-2": {
+      "name": "Chart Series 2",
+      "oklch": "oklch(0.68 0.15 85)",
+      "description": "Kuning emas untuk data series kedua"
+    },
+    "chart-3": {
+      "name": "Chart Series 3",
+      "oklch": "oklch(0.55 0.12 30)",
+      "description": "Orange-red untuk data series ketiga"
+    },
+    "chart-4": {
+      "name": "Chart Series 4",
+      "oklch": "oklch(0.50 0.10 200)",
+      "description": "Biru untuk data series keempat"
+    },
+    "chart-5": {
+      "name": "Chart Series 5",
+      "oklch": "oklch(0.60 0.08 50)",
+      "description": "Orange pale untuk data series kelima"
+    }
+  },
+  "dark": {
+    "primary": {
+      "name": "Primary Green",
+      "oklch": "oklch(0.48 0.12 145)",
+      "hue": 145,
+      "description": "Hijau medium untuk tombol utama dan heading"
+    },
+    "primary-foreground": {
+      "name": "Primary Foreground",
+      "oklch": "oklch(0.98 0.02 145)",
+      "description": "Putih off-white untuk teks di atas primary"
+    },
+    "secondary": {
+      "name": "Secondary Dark Brown",
+      "oklch": "oklch(0.30 0.03 85)",
+      "hue": 85,
+      "description": "Cokelat gelap untuk background sekunder"
+    },
+    "secondary-foreground": {
+      "name": "Secondary Pale Yellow",
+      "oklch": "oklch(0.90 0.02 85)",
+      "description": "Kuning pale untuk teks di atas secondary"
+    },
+    "accent": {
+      "name": "Accent Dark Gold",
+      "oklch": "oklch(0.40 0.08 85)",
+      "hue": 85,
+      "description": "Kuning tua untuk highlight dan accent elements"
+    },
+    "accent-foreground": {
+      "name": "Accent Foreground",
+      "oklch": "oklch(0.98 0.02 85)",
+      "description": "Putih off-white untuk teks di atas accent"
+    },
+    "background": {
+      "name": "Background Dark",
+      "oklch": "oklch(0.20 0.02 260)",
+      "description": "Hitam gelap untuk background utama"
+    },
+    "foreground": {
+      "name": "Foreground Light",
+      "oklch": "oklch(0.95 0.02 260)",
+      "description": "Putih off-white untuk teks utama"
+    },
+    "card": {
+      "name": "Card Dark Gray",
+      "oklch": "oklch(0.22 0.02 260)",
+      "description": "Abu-abu gelap untuk card backgrounds"
+    },
+    "card-foreground": {
+      "name": "Card Foreground",
+      "oklch": "oklch(0.95 0.02 260)",
+      "description": "Putih off-white untuk teks card"
+    },
+    "popover": {
+      "name": "Popover Dark Gray",
+      "oklch": "oklch(0.22 0.02 260)",
+      "description": "Abu-abu gelap untuk popover backgrounds"
+    },
+    "popover-foreground": {
+      "name": "Popover Foreground",
+      "oklch": "oklch(0.95 0.02 260)",
+      "description": "Putih off-white untuk teks popover"
+    },
+    "border": {
+      "name": "Border Medium Gray",
+      "oklch": "oklch(0.30 0.02 260)",
+      "description": "Abu-abu medium untuk garis border"
+    },
+    "input": {
+      "name": "Input Dark Medium",
+      "oklch": "oklch(0.26 0.015 260)",
+      "description": "Abu-abu medium gelap untuk input field backgrounds"
+    },
+    "muted": {
+      "name": "Muted Dark",
+      "oklch": "oklch(0.32 0.02 260)",
+      "description": "Abu-abu medium untuk warna muted"
+    },
+    "muted-foreground": {
+      "name": "Muted Foreground Light",
+      "oklch": "oklch(0.78 0.02 260)",
+      "description": "Abu-abu terang untuk teks muted"
+    },
+    "destructive": {
+      "name": "Destructive Red",
+      "oklch": "oklch(0.45 0.18 25)",
+      "hue": 25,
+      "description": "Merah medium untuk delete dan danger buttons"
+    },
+    "destructive-foreground": {
+      "name": "Destructive Foreground",
+      "oklch": "oklch(0.98 0.02 25)",
+      "description": "Putih off-white untuk teks destructive"
+    },
+    "ring": {
+      "name": "Ring Focus",
+      "oklch": "oklch(0.48 0.10 145)",
+      "description": "Warna untuk focus ring"
+    },
+    "sidebar": {
+      "name": "Sidebar Dark Gray",
+      "oklch": "oklch(0.22 0.03 260)",
+      "description": "Abu-abu gelap untuk sidebar background"
+    },
+    "sidebar-foreground": {
+      "name": "Sidebar Text",
+      "oklch": "oklch(0.95 0.02 260)",
+      "description": "Putih off-white untuk teks sidebar"
+    },
+    "sidebar-primary": {
+      "name": "Sidebar Active Green",
+      "oklch": "oklch(0.48 0.12 145)",
+      "description": "Hijau medium untuk active state sidebar"
+    },
+    "sidebar-primary-foreground": {
+      "name": "Sidebar Active Text",
+      "oklch": "oklch(0.95 0.02 145)",
+      "description": "Putih off-white untuk teks active state"
+    },
+    "sidebar-accent": {
+      "name": "Sidebar Hover",
+      "oklch": "oklch(0.30 0.03 260)",
+      "description": "Abu-abu medium untuk hover state"
+    },
+    "sidebar-accent-foreground": {
+      "name": "Sidebar Accent Text",
+      "oklch": "oklch(0.95 0.02 260)",
+      "description": "Putih off-white untuk teks accent"
+    },
+    "sidebar-border": {
+      "name": "Sidebar Border",
+      "oklch": "oklch(0.30 0.02 260)",
+      "description": "Abu-abu medium untuk border sidebar"
+    },
+    "sidebar-ring": {
+      "name": "Sidebar Focus Ring",
+      "oklch": "oklch(0.48 0.10 145)",
+      "description": "Hijau medium untuk focus ring sidebar"
+    },
+    "chart-1": {
+      "name": "Chart Series 1",
+      "oklch": "oklch(0.48 0.24 264.376)",
+      "description": "Biru cerah untuk data series pertama"
+    },
+    "chart-2": {
+      "name": "Chart Series 2",
+      "oklch": "oklch(0.70 0.17 162.48)",
+      "description": "Cyan terang untuk data series kedua"
+    },
+    "chart-3": {
+      "name": "Chart Series 3",
+      "oklch": "oklch(0.77 0.19 70.08)",
+      "description": "Kuning terang untuk data series ketiga"
+    },
+    "chart-4": {
+      "name": "Chart Series 4",
+      "oklch": "oklch(0.63 0.26 303.9)",
+      "description": "Magenta untuk data series keempat"
+    },
+    "chart-5": {
+      "name": "Chart Series 5",
+      "oklch": "oklch(0.65 0.25 16.439)",
+      "description": "Red-orange cerah untuk data series kelima"
+    }
+  },
+  "notes": {
+    "usage": "Copy values dari 'oklch' field ke OKLch.com untuk konversi HEX",
+    "conversion": "Visit https://oklch.com/ untuk instant conversion OKLCH to HEX/RGB",
+    "accessibility": "Semua warna telah diuji untuk kontras minimal 4.5:1 pada teks regular",
+    "colorblind": "Palet dirancang untuk friendly dengan berbagai jenis colorblindness"
+  }
+}

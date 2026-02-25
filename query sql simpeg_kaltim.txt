@@ -1,0 +1,114 @@
+CREATE TABLE IF NOT EXISTS public."Pegawai"
+(
+    "nipPegawai" character(18) NOT NULL,
+    nama character varying(150) NOT NULL,
+    "gelarDepan" character varying(50),
+    "gelarBelakang" character varying(50),
+    "tempatLahir" character varying(100) NOT NULL,
+    "tanggalLahir" date NOT NULL,
+    "jenisKelamin" character varying(10) NOT NULL,
+    agama character varying(20),
+    alamat text,
+    email character varying(120),
+    "noHp" character varying(20) NOT NULL,
+    foto character varying(255) NOT NULL,
+    PRIMARY KEY ("nipPegawai"),
+    UNIQUE (email)
+);
+
+CREATE TABLE IF NOT EXISTS public."IdentitasResmi"
+(
+    "nipIdResmi" character(18) NOT NULL,
+    nik character(16) NOT NULL,
+    "noBpjs" character varying(20),
+    "noNpwp" character varying(25),
+    karpeg character varying(30),
+    "karsuKarsi" character varying(30),
+    taspen character varying(30),
+    PRIMARY KEY ("nipIdResmi")
+);
+
+CREATE TABLE IF NOT EXISTS public."EfilePegawai"
+(
+    "idFile" serial NOT NULL,
+    "nipEfile" character(18) NOT NULL,
+    "jenisDokumen" character varying(30) NOT NULL,
+    "namaFile" character varying(255) NOT NULL,
+    "filePath" character varying(255) NOT NULL,
+    "waktuUpload" timestamp with time zone NOT NULL,
+    PRIMARY KEY ("idFile")
+);
+
+CREATE TABLE IF NOT EXISTS public."Kepegawaian"
+(
+    "nipKepegawaian" character(18) NOT NULL,
+    "statusPegawai" character varying(20) NOT NULL,
+    "jenisPegawai" character varying(50) NOT NULL,
+    "tmtCpns" date,
+    "tmtPns" date,
+    "masaKerjaTahun" integer NOT NULL,
+    "masaKerjaBulan" integer NOT NULL,
+    PRIMARY KEY ("nipKepegawaian")
+);
+
+CREATE TABLE IF NOT EXISTS public."Pangkat"
+(
+    "idPangkat" serial NOT NULL,
+    pangkat character varying(50) NOT NULL,
+    golongan character varying(5) NOT NULL,
+    ruang character(1) NOT NULL,
+    urutan integer NOT NULL,
+    PRIMARY KEY ("idPangkat")
+);
+
+CREATE TABLE IF NOT EXISTS public."RiwayatPangkat"
+(
+    "idRiwayat" serial NOT NULL,
+    "nipRiwayat" character(18) NOT NULL,
+    "idPangkatRiwayat" integer NOT NULL,
+    "tmtPangkat" date NOT NULL,
+    "tmtSelesai" date,
+    status boolean NOT NULL,
+    PRIMARY KEY ("idRiwayat")
+);
+
+ALTER TABLE IF EXISTS public."IdentitasResmi"
+    ADD FOREIGN KEY ("nipIdResmi")
+    REFERENCES public."Pegawai" ("nipPegawai") MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION
+    NOT VALID;
+
+
+ALTER TABLE IF EXISTS public."EfilePegawai"
+    ADD FOREIGN KEY ("nipEfile")
+    REFERENCES public."Pegawai" ("nipPegawai") MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION
+    NOT VALID;
+
+
+ALTER TABLE IF EXISTS public."Kepegawaian"
+    ADD FOREIGN KEY ("nipKepegawaian")
+    REFERENCES public."Pegawai" ("nipPegawai") MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION
+    NOT VALID;
+
+
+ALTER TABLE IF EXISTS public."RiwayatPangkat"
+    ADD CONSTRAINT "nipPegawai" FOREIGN KEY ("nipRiwayat")
+    REFERENCES public."Pegawai" ("nipPegawai") MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION
+    NOT VALID;
+
+
+ALTER TABLE IF EXISTS public."RiwayatPangkat"
+    ADD CONSTRAINT "idPangkat" FOREIGN KEY ("idPangkatRiwayat")
+    REFERENCES public."Pangkat" ("idPangkat") MATCH SIMPLE
+    ON UPDATE NO ACTION
+    ON DELETE NO ACTION
+    NOT VALID;
+
+END;
