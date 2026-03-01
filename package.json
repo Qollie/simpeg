@@ -2,8 +2,8 @@
   "name": "simpeg-workspace",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n api,web -c cyan,magenta \"php api/artisan serve --host=127.0.0.1 --port=8000\" \"npm --prefix react run dev\"",
-    "dev:api": "php api/artisan serve --host=127.0.0.1 --port=8000",
+    "dev": "concurrently -n api,web -c cyan,magenta \"php -S 127.0.0.1:8000 -t api/public\" \"npm --prefix react run dev\"",
+    "dev:api": "php -S 127.0.0.1:8000 -t api/public",
     "dev:web": "npm --prefix react run dev"
   },
   "devDependencies": {
