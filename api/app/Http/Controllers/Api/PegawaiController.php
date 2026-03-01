@@ -118,7 +118,7 @@ class PegawaiController extends Controller
         if ($request->hasFile('foto')) {
             $stored = $request->file('foto')->storeAs(
                 'pegawai/photos',
-                $id.'-'.now()->format('YmdHis').'.'.$request->file('foto')->getClientOriginalExtension(),
+                $id.'-'.now()->format('YmdHis').'-'.Str::random(6).'.'.$request->file('foto')->getClientOriginalExtension(),
                 'public'
             );
 
