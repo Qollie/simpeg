@@ -44,11 +44,34 @@ export function EditEmployeeModal({
   existingPegawai = [],
 }: EditEmployeeModalProps) {
   const [formData, setFormData] = useState<Partial<Pegawai>>({})
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     if (pegawai) {
-      setFormData(pegawai)
+      setFormData({
+        ...pegawai,
+        status: pegawai.status ?? pegawai.kepegawaian?.statusPegawai ?? "",
+        departemen: pegawai.departemen ?? pegawai.kepegawaian?.jenisPegawai ?? "",
+        identitasResmi: {
+          nipIdResmi: pegawai.identitasResmi?.nipIdResmi ?? pegawai.nipPegawai,
+          nik: pegawai.identitasResmi?.nik ?? "",
+          noBpjs: pegawai.identitasResmi?.noBpjs ?? "",
+          noNpwp: pegawai.identitasResmi?.noNpwp ?? "",
+          karpeg: pegawai.identitasResmi?.karpeg ?? "",
+          karsuKarsi: pegawai.identitasResmi?.karsuKarsi ?? "",
+          taspen: pegawai.identitasResmi?.taspen ?? "",
+        },
+        kepegawaian: {
+          statusPegawai: pegawai.kepegawaian?.statusPegawai ?? pegawai.status ?? "",
+          jenisPegawai: pegawai.kepegawaian?.jenisPegawai ?? pegawai.departemen ?? "",
+          tmtCpns: pegawai.kepegawaian?.tmtCpns ?? pegawai.tanggalMasuk ?? "",
+          tmtPns: pegawai.kepegawaian?.tmtPns ?? "",
+          masaKerjaTahun: pegawai.kepegawaian?.masaKerjaTahun ?? 0,
+          masaKerjaBulan: pegawai.kepegawaian?.masaKerjaBulan ?? 0,
+        },
+      })
+      setFotoFile(null)
     }
   }, [pegawai])
 
@@ -148,7 +171,7 @@ export function EditEmployeeModal({
       kepegawaian: mergedKepegawaian,
     } as Pegawai
 
-    onSave(payload)
+    onSave(payload, fotoFile)
     toast({
       title: "Data berhasil disimpan",
       description: `Data pegawai ${formData.nama} telah diperbarui.`,
@@ -167,6 +190,35 @@ export function EditEmployeeModal({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Foto Profil */}
+          <div className="flex items-start gap-4">
+            <div className="relative h-20 w-20 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground">
+              {fotoFile ? (
+                <img
+                  src={URL.createObjectURL(fotoFile)}
+                  alt="Preview Foto"
+                  className="h-full w-full object-cover"
+                />
+              ) : pegawai?.foto ? (
+                <img src={pegawai.foto} alt={pegawai.nama} className="h-full w-full object-cover" />
+              ) : (
+                pegawai?.nama?.slice(0, 2)?.toUpperCase() || "PF"
+              )}
+            </div>
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="foto" className="text-sm text-foreground">
+                Foto Profil
+              </Label>
+              <Input
+                id="foto"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)}
+                className="bg-secondary text-sm"
+              />
+              <p className="text-xs text-muted-foreground">Format gambar, maks 5MB.</p>
+            </div>
+          </div>
           {/* Identitas Section */}
           <h3 className="text-base font-semibold text-foreground border-b border-border pb-2">Identitas Pegawai</h3>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">

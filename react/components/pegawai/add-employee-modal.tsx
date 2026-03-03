@@ -25,7 +25,7 @@ import { departemenList, golonganList, statusList } from "@/lib/mock-data"
 interface AddEmployeeModalProps {
   isOpen: boolean
   onClose: () => void
-  onAdd: (pegawai: Pegawai, dokumen: Dokumen[]) => void
+  onAdd: (pegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => void
   existingPegawai?: Pegawai[]
 }
 
@@ -105,7 +105,7 @@ export function AddEmployeeModal({
   const [formData, setFormData] = useState<FormState>(initialForm)
 
   const [dokumen, setDokumen] = useState<File[]>([])
-  const [, setFoto] = useState<File | null>(null)
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -133,7 +133,7 @@ export function AddEmployeeModal({
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
-      setFoto(file)
+      setFotoFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
         setFotoPreview(reader.result as string)
@@ -261,14 +261,14 @@ export function AddEmployeeModal({
       efiles,
     }
 
-    onAdd(newPegawai, dokumenObjects)
+    onAdd(newPegawai, dokumenObjects, fotoFile)
     resetForm()
   }
 
   const resetForm = () => {
     setFormData(initialForm)
     setDokumen([])
-    setFoto(null)
+    setFotoFile(null)
     setFotoPreview(null)
     onClose()
   }

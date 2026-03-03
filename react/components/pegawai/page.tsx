@@ -28,6 +28,16 @@ const DEFAULT_PAGINATION: PaginationMeta = {
   total: 0,
 }
 
+// Normalize status coming from various API fields/casing
+const normalisasiStatusKarir = (p: any): string => {
+  const raw = (p?.status ?? p?.kepegawaian?.statusPegawai ?? "Aktif") as string
+  const lower = raw.toLowerCase()
+  if (["aktif", "active"].includes(lower)) return "Aktif"
+  if (["cuti"].includes(lower)) return "Cuti"
+  if (["pensiun", "resign", "berhenti", "nonaktif"].includes(lower)) return "Nonaktif"
+  return raw || "Aktif"
+}
+
 const mapPegawaiForModal = (p: any): Pegawai => {
   const riwayatTerbaru = [...(p.riwayatPangkat ?? [])]
     .sort((a: any, b: any) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
@@ -104,7 +114,51 @@ export default function KarirPage() {
       .then((r) => r.json())
       .then((json) => {
         if (!mounted) return
-        setPromotionItems(json.data ?? [])
+        const items: any[] = json.data ?? []
+
+        const mapped: Pegawai[] = items.map((p: any) => {
+          const identitas = p.identitasResmi ?? p.identitas_resmi ?? {}
+          const kepegawaianRaw = p.kepegawaian ?? {}
+          const riwayatPangkatRaw = p.riwayatPangkat ?? p.riwayat_pangkat ?? []
+
+          const kepegawaian = {
+            ...kepegawaianRaw,
+            statusPegawai: kepegawaianRaw.statusPegawai ?? p.status ?? "Aktif",
+            jenisPegawai: kepegawaianRaw.jenisPegawai ?? p.departemen ?? "-",
+            tmtCpns: kepegawaianRaw.tmtCpns ?? p.tmtCpns ?? p.tanggalMasuk ?? null,
+            tmtPns: kepegawaianRaw.tmtPns ?? p.tmtPns ?? null,
+            masaKerjaTahun: kepegawaianRaw.masaKerjaTahun ?? p.masaKerjaTahun ?? 0,
+            masaKerjaBulan: kepegawaianRaw.masaKerjaBulan ?? p.masaKerjaBulan ?? 0,
+          }
+
+          const riwayatTerbaru = [...riwayatPangkatRaw]
+            .sort((a: any, b: any) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
+
+          const pangkatTerbaru = riwayatTerbaru?.pangkat
+          const golongan = pangkatTerbaru ? `${pangkatTerbaru.pangkat ?? ""} (${pangkatTerbaru.golongan ?? ""})`.trim() : p.golongan
+
+          return {
+            ...p,
+            identitasResmi: {
+              nipIdResmi: identitas.nipIdResmi ?? p.nipPegawai,
+              nik: identitas.nik ?? "",
+              noBpjs: identitas.noBpjs ?? "",
+              noNpwp: identitas.noNpwp ?? "",
+              karpeg: identitas.karpeg ?? "",
+              karsuKarsi: identitas.karsuKarsi ?? "",
+              taspen: identitas.taspen ?? "",
+            },
+            kepegawaian,
+            riwayatPangkat: riwayatPangkatRaw,
+            departemen: kepegawaian.jenisPegawai,
+            status: normalisasiStatusKarir({ ...p, status: p.status ?? kepegawaian.statusPegawai, kepegawaian }),
+            tanggalMasuk: p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
+            golongan,
+            tmtGolongan: riwayatTerbaru?.tmtPangkat ?? p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
+          }
+        })
+
+        setPromotionItems(mapped as PromotionEligibilityItem[])
         setPromotionPagination({
           currentPage: json.current_page ?? 1,
           lastPage: json.last_page ?? 1,
