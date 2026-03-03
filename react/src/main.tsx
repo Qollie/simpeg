@@ -3,9 +3,16 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 // Menggunakan alias @ untuk mengakses folder app di root
 import '../app/globals.css' 
-import { getAuth } from '@/lib/auth'
+import { clearAuth, getAuth } from '@/lib/auth'
 
 const originalFetch = window.fetch.bind(window)
+
+const redirectToLogin = () => {
+  clearAuth()
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login'
+  }
+}
 
 window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string'
@@ -25,6 +32,7 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   const token = auth?.token
 
   if (!token) {
+    redirectToLogin()
     return originalFetch(input, init)
   }
 
@@ -36,6 +44,11 @@ window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   return originalFetch(input, {
     ...init,
     headers,
+  }).then((response) => {
+    if (response.status === 401 || response.status === 419) {
+      redirectToLogin()
+    }
+    return response
   })
 }
 

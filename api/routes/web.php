@@ -12,6 +12,11 @@ Route::get('/', function () {
 
 Route::prefix('api')->withoutMiddleware([ValidateCsrfToken::class])->group(function () {
     Route::post('auth/login', [AuthController::class, 'login']);
+
+    // Akses dokumen tanpa perlu token (file sudah berada di storage publik)
+    Route::get('documents/{id}/stream', [PegawaiController::class, 'streamDocument']);
+    Route::get('documents/{id}/download', [PegawaiController::class, 'downloadDocument']);
+
     Route::middleware('api.auth')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
 

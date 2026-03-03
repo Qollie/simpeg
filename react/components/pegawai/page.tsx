@@ -37,7 +37,21 @@ export default function KarirPage() {
         const items: any[] = json.data ?? []
 
         const mapped: Pegawai[] = items.map((p: any) => {
-          const riwayatTerbaru = [...(p.riwayatPangkat ?? [])]
+          const identitas = p.identitasResmi ?? p.identitas_resmi ?? {}
+          const kepegawaianRaw = p.kepegawaian ?? {}
+          const riwayatPangkatRaw = p.riwayatPangkat ?? p.riwayat_pangkat ?? []
+
+          const kepegawaian = {
+            ...kepegawaianRaw,
+            statusPegawai: kepegawaianRaw.statusPegawai ?? p.status ?? "Aktif",
+            jenisPegawai: kepegawaianRaw.jenisPegawai ?? p.departemen ?? "-",
+            tmtCpns: kepegawaianRaw.tmtCpns ?? p.tmtCpns ?? p.tanggalMasuk ?? null,
+            tmtPns: kepegawaianRaw.tmtPns ?? p.tmtPns ?? null,
+            masaKerjaTahun: kepegawaianRaw.masaKerjaTahun ?? p.masaKerjaTahun ?? 0,
+            masaKerjaBulan: kepegawaianRaw.masaKerjaBulan ?? p.masaKerjaBulan ?? 0,
+          }
+
+          const riwayatTerbaru = [...riwayatPangkatRaw]
             .sort((a: any, b: any) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
 
           const pangkatTerbaru = riwayatTerbaru?.pangkat
@@ -47,11 +61,22 @@ export default function KarirPage() {
 
           return {
             ...p,
-            departemen: p.kepegawaian?.jenisPegawai ?? p.departemen,
-            status: normalisasiStatusKarir(p),
-            tanggalMasuk: p.tanggalMasuk ?? p.kepegawaian?.tmtCpns ?? p.kepegawaian?.tmtPns,
+            identitasResmi: {
+              nipIdResmi: identitas.nipIdResmi ?? p.nipPegawai,
+              nik: identitas.nik ?? '',
+              noBpjs: identitas.noBpjs ?? '',
+              noNpwp: identitas.noNpwp ?? '',
+              karpeg: identitas.karpeg ?? '',
+              karsuKarsi: identitas.karsuKarsi ?? '',
+              taspen: identitas.taspen ?? '',
+            },
+            kepegawaian,
+            riwayatPangkat: riwayatPangkatRaw,
+            departemen: kepegawaian.jenisPegawai,
+            status: normalisasiStatusKarir({ ...p, status: p.status ?? kepegawaian.statusPegawai, kepegawaian }),
+            tanggalMasuk: p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
             golongan,
-            tmtGolongan: riwayatTerbaru?.tmtPangkat ?? p.tanggalMasuk ?? p.kepegawaian?.tmtCpns ?? p.kepegawaian?.tmtPns,
+            tmtGolongan: riwayatTerbaru?.tmtPangkat ?? p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
           }
         })
 

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
@@ -198,6 +199,9 @@ class PegawaiController extends Controller
     {
         $pegawai = Pegawai::with(['identitasResmi', 'kepegawaian', 'riwayatPangkat.pangkat', 'efiles'])->findOrFail($id);
 
+        $pegawaiTable = (new Pegawai())->getTable();
+        $identitasTable = (new IdentitasResmi())->getTable();
+
         $validated = $request->validate([
             'nama' => ['nullable', 'string', 'max:150'],
             'gelarDepan' => ['nullable', 'string', 'max:50'],
@@ -215,6 +219,22 @@ class PegawaiController extends Controller
             'departemen' => ['nullable', 'string', 'max:150'],
             'tanggalMasuk' => ['nullable', 'date'],
             'foto' => ['nullable', 'file', 'image', 'max:5120'],
+
+            // Identitas resmi
+            'nik' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'nik')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'noBpjs' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noBpjs')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'noNpwp' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noNpwp')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'karpeg' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karpeg')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'karsuKarsi' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karsuKarsi')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'taspen' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'taspen')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+
+            // Kepegawaian
+            'statusPegawai' => ['nullable', 'string', 'max:50'],
+            'jenisPegawai' => ['nullable', 'string', 'max:100'],
+            'tmtCpns' => ['nullable', 'date'],
+            'tmtPns' => ['nullable', 'date'],
+            'masaKerjaTahun' => ['nullable', 'integer', 'min:0'],
+            'masaKerjaBulan' => ['nullable', 'integer', 'min:0', 'max:11'],
         ]);
 
         if ($request->hasFile('foto')) {
@@ -230,19 +250,39 @@ class PegawaiController extends Controller
         $pegawai->fill($validated);
         $pegawai->save();
 
-        if ($request->filled('departemen') || $request->filled('status')) {
+        // Update identitas resmi (if any field provided)
+        if ($request->hasAny(['nik', 'noBpjs', 'noNpwp', 'karpeg', 'karsuKarsi', 'taspen'])) {
+            $identitasPayload = [
+                'nik' => $request->input('nik', $pegawai->identitasResmi?->nik),
+                'noBpjs' => $request->input('noBpjs', $pegawai->identitasResmi?->noBpjs),
+                'noNpwp' => $request->input('noNpwp', $pegawai->identitasResmi?->noNpwp),
+                'karpeg' => $request->input('karpeg', $pegawai->identitasResmi?->karpeg),
+                'karsuKarsi' => $request->input('karsuKarsi', $pegawai->identitasResmi?->karsuKarsi),
+                'taspen' => $request->input('taspen', $pegawai->identitasResmi?->taspen),
+            ];
+
+            IdentitasResmi::updateOrCreate(
+                ['nipIdResmi' => $id],
+                $identitasPayload + ['nipIdResmi' => $id]
+            );
+        }
+
+        // Update kepegawaian (if any kepegawaian-related field provided)
+        if ($request->hasAny(['statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'masaKerjaTahun', 'masaKerjaBulan', 'departemen'])) {
             $existing = Kepegawaian::where('nipKepegawaian', $id)->first();
+
+            $kepegawaianPayload = [
+                'statusPegawai' => $request->input('statusPegawai', $existing?->statusPegawai),
+                'jenisPegawai' => $request->input('jenisPegawai', $existing?->jenisPegawai ?? $request->input('departemen')),
+                'tmtCpns' => $request->input('tmtCpns', $existing?->tmtCpns),
+                'tmtPns' => $request->input('tmtPns', $existing?->tmtPns),
+                'masaKerjaTahun' => $request->input('masaKerjaTahun', $existing?->masaKerjaTahun ?? 0),
+                'masaKerjaBulan' => $request->input('masaKerjaBulan', $existing?->masaKerjaBulan ?? 0),
+            ];
 
             Kepegawaian::updateOrCreate(
                 ['nipKepegawaian' => $id],
-                [
-                    'statusPegawai' => $request->input('status', $existing?->statusPegawai ?? 'PNS'),
-                    'jenisPegawai' => $request->input('departemen', $existing?->jenisPegawai ?? '-'),
-                    'tmtCpns' => $existing?->tmtCpns,
-                    'tmtPns' => $existing?->tmtPns,
-                    'masaKerjaTahun' => $existing?->masaKerjaTahun ?? 0,
-                    'masaKerjaBulan' => $existing?->masaKerjaBulan ?? 0,
-                ]
+                $kepegawaianPayload + ['nipKepegawaian' => $id]
             );
         }
 
@@ -318,6 +358,75 @@ class PegawaiController extends Controller
         $efile->delete();
 
         return response()->json(['message' => 'Dokumen dihapus']);
+    }
+
+    private function resolvePublicPath(?string $filePath): ?string
+    {
+        if (empty($filePath)) {
+            return null;
+        }
+
+        // Jika sudah URL penuh, coba ambil bagian setelah /storage/
+        if (Str::startsWith($filePath, ['http://', 'https://'])) {
+            $pos = strpos($filePath, '/storage/');
+            if ($pos !== false) {
+                $filePath = substr($filePath, $pos);
+            } else {
+                // URL eksternal, biarkan caller menangani
+                return $filePath;
+            }
+        }
+
+        if (Str::startsWith($filePath, '/storage/')) {
+            return ltrim(substr($filePath, 9), '/'); // remove "/storage/"
+        }
+
+        if (Str::startsWith($filePath, 'storage/')) {
+            return ltrim(substr($filePath, 8), '/'); // remove "storage/"
+        }
+
+        return ltrim($filePath, '/');
+    }
+
+    public function streamDocument(string $id): StreamedResponse|\Illuminate\Http\RedirectResponse
+    {
+        $efile = EfilePegawai::query()->findOrFail((int) $id);
+
+        $relative = $this->resolvePublicPath($efile->filePath);
+
+        // Jika filePath adalah URL eksternal (bukan menuju storage), redirect
+        if (Str::startsWith($relative, ['http://', 'https://'])) {
+            return redirect()->away($relative);
+        }
+
+        if (!$relative || !Storage::disk('public')->exists($relative)) {
+            abort(404, 'File tidak ditemukan');
+        }
+
+        $mime = Storage::disk('public')->mimeType($relative) ?: 'application/octet-stream';
+        $path = Storage::disk('public')->path($relative);
+
+        return response()->file($path, ['Content-Type' => $mime]);
+    }
+
+    public function downloadDocument(string $id)
+    {
+        $efile = EfilePegawai::query()->findOrFail((int) $id);
+
+        $relative = $this->resolvePublicPath($efile->filePath);
+
+        if (Str::startsWith($relative, ['http://', 'https://'])) {
+            return redirect()->away($relative);
+        }
+
+        if (!$relative || !Storage::disk('public')->exists($relative)) {
+            abort(404, 'File tidak ditemukan');
+        }
+
+        $path = Storage::disk('public')->path($relative);
+        $downloadName = $efile->namaFile ?: basename($path);
+
+        return response()->download($path, $downloadName);
     }
 
     public function destroy(string $id)

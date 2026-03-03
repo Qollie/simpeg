@@ -22,6 +22,98 @@ import type { Pegawai, Dokumen } from "@/lib/types"
 
 const apiBase = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") ?? ""
 
+type PegawaiApi = any
+
+const normalizePegawaiFromApi = (p: PegawaiApi, reloadKey = 0): Pegawai => {
+  const identitas = p.identitasResmi ?? p.identitas_resmi ?? {}
+  const kepegawaianRaw = p.kepegawaian ?? {}
+  const riwayatPangkatRaw = p.riwayatPangkat ?? p.riwayat_pangkat ?? []
+
+  const statusPegawai = kepegawaianRaw.statusPegawai ?? ""
+  const jenisPegawai = kepegawaianRaw.jenisPegawai ?? p.departemen ?? ""
+
+  const kepegawaian = {
+    ...kepegawaianRaw,
+    statusPegawai,
+    jenisPegawai,
+    tmtCpns: kepegawaianRaw.tmtCpns ?? p.tmtCpns ?? p.tanggalMasuk ?? "",
+    tmtPns: kepegawaianRaw.tmtPns ?? p.tmtPns ?? "",
+    masaKerjaTahun: kepegawaianRaw.masaKerjaTahun ?? p.masaKerjaTahun ?? 0,
+    masaKerjaBulan: kepegawaianRaw.masaKerjaBulan ?? p.masaKerjaBulan ?? 0,
+  }
+  if (!kepegawaian.statusPegawai) {
+    kepegawaian.statusPegawai = ""
+  }
+  if (!kepegawaian.jenisPegawai) {
+    kepegawaian.jenisPegawai = p.departemen ?? ""
+  }
+
+  const riwayatTerbaru = [...riwayatPangkatRaw]
+    .sort((a: any, b: any) => {
+      const da = new Date(a?.tmtPangkat ?? 0).getTime()
+      const db = new Date(b?.tmtPangkat ?? 0).getTime()
+      return db - da
+    })[0]
+
+  const pangkatTerbaru = riwayatTerbaru?.pangkat
+  const golongan = pangkatTerbaru
+    ? `${pangkatTerbaru.pangkat ?? ""} (${pangkatTerbaru.golongan ?? ""})`.trim()
+    : (p.golongan ?? undefined)
+
+  return {
+    nipPegawai: p.nipPegawai,
+    nama: p.nama,
+    gelarDepan: p.gelarDepan ?? undefined,
+    gelarBelakang: p.gelarBelakang ?? undefined,
+    jabatan: p.jabatan ?? undefined,
+    departemen: p.departemen ?? jenisPegawai ?? "",
+    golongan,
+    status: p.status ?? statusPegawai ?? "Aktif",
+    tanggalMasuk: p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns ?? undefined,
+    email: p.email ?? undefined,
+    noHp: p.noHp ?? "",
+    foto: p.foto
+      ? `${p.foto}${String(p.foto).includes("?") ? "&" : "?"}v=${reloadKey}`
+      : undefined,
+    tempatLahir: p.tempatLahir ?? "",
+    tanggalLahir: p.tanggalLahir ?? "",
+    jenisKelamin: p.jenisKelamin ?? "",
+    agama: p.agama ?? undefined,
+    alamat: p.alamat ?? undefined,
+    identitasResmi: Object.keys(identitas).length
+      ? {
+          nipIdResmi: identitas.nipIdResmi ?? p.nipPegawai,
+          nik: identitas.nik ?? "",
+          noBpjs: identitas.noBpjs ?? "",
+          noNpwp: identitas.noNpwp ?? "",
+          karpeg: identitas.karpeg ?? "",
+          karsuKarsi: identitas.karsuKarsi ?? "",
+          taspen: identitas.taspen ?? "",
+        }
+      : {
+          nipIdResmi: p.nipPegawai,
+          nik: "",
+          noBpjs: "",
+          noNpwp: "",
+          karpeg: "",
+          karsuKarsi: "",
+          taspen: "",
+        },
+    efiles: p.efiles ?? [],
+    kepegawaian,
+    riwayatPangkat: riwayatPangkatRaw.map((r: any) => ({
+      ...r,
+      status: typeof r.status === "boolean" ? (r.status ? "Berlaku" : "Selesai") : r.status,
+      pangkat: r.pangkat
+        ? {
+            idPangkat: r.pangkat.idPangkat,
+            namaPangkat: `${r.pangkat.pangkat ?? ""} (${r.pangkat.golongan ?? ""})`.trim(),
+          }
+        : undefined,
+    })),
+  }
+}
+
 export default function PegawaiPage() {
   const [pegawaiList, setPegawaiList] = useState<Pegawai[]>([])
   const [departemenOptions, setDepartemenOptions] = useState<string[]>(["Semua"])
@@ -70,67 +162,7 @@ export default function PegawaiPage() {
         .then((r) => r.json())
         .then((json) => {
           const items = json.data ?? json
-          const mapped: Pegawai[] = (items || []).map((p: any) => {
-            const riwayatTerbaru = [...(p.riwayatPangkat ?? [])]
-              .sort((a: any, b: any) => {
-                const da = new Date(a?.tmtPangkat ?? 0).getTime()
-                const db = new Date(b?.tmtPangkat ?? 0).getTime()
-                return db - da
-              })[0]
-
-            const pangkatTerbaru = riwayatTerbaru?.pangkat
-            const golongan = pangkatTerbaru
-              ? `${pangkatTerbaru.pangkat ?? ""} (${pangkatTerbaru.golongan ?? ""})`.trim()
-              : (p.golongan ?? undefined)
-
-            const statusPegawai = p.kepegawaian?.statusPegawai ?? p.status ?? 'Aktif'
-            const jenisPegawai = p.kepegawaian?.jenisPegawai ?? p.departemen ?? '-'
-
-            return {
-              nipPegawai: p.nipPegawai,
-              nama: p.nama,
-              gelarDepan: p.gelarDepan ?? undefined,
-              gelarBelakang: p.gelarBelakang ?? undefined,
-              jabatan: p.jabatan ?? undefined,
-              departemen: jenisPegawai,
-              golongan,
-              status: statusPegawai,
-              tanggalMasuk: p.tanggalMasuk ?? p.kepegawaian?.tmtCpns ?? p.kepegawaian?.tmtPns ?? undefined,
-              email: p.email ?? undefined,
-              noHp: p.noHp ?? '',
-              foto: p.foto
-                ? `${p.foto}${String(p.foto).includes('?') ? '&' : '?'}v=${reloadKey}`
-                : undefined,
-              tempatLahir: p.tempatLahir ?? '',
-              tanggalLahir: p.tanggalLahir ?? '',
-              jenisKelamin: p.jenisKelamin ?? '',
-              agama: p.agama ?? undefined,
-              alamat: p.alamat ?? undefined,
-              identitasResmi: p.identitasResmi
-                ? {
-                    nipIdResmi: p.identitasResmi.nipIdResmi ?? p.nipPegawai,
-                    nik: p.identitasResmi.nik ?? undefined,
-                    noBpjs: p.identitasResmi.noBpjs ?? undefined,
-                    noNpwp: p.identitasResmi.noNpwp ?? undefined,
-                    karpeg: p.identitasResmi.karpeg ?? undefined,
-                    karsuKarsi: p.identitasResmi.karsuKarsi ?? undefined,
-                    taspen: p.identitasResmi.taspen ?? undefined,
-                  }
-                : undefined,
-              efiles: p.efiles ?? [],
-              kepegawaian: p.kepegawaian,
-              riwayatPangkat: (p.riwayatPangkat ?? []).map((r: any) => ({
-                ...r,
-                status: typeof r.status === 'boolean' ? (r.status ? 'Berlaku' : 'Selesai') : r.status,
-                pangkat: r.pangkat
-                  ? {
-                      idPangkat: r.pangkat.idPangkat,
-                      namaPangkat: `${r.pangkat.pangkat ?? ''} (${r.pangkat.golongan ?? ''})`.trim(),
-                    }
-                  : undefined,
-              })),
-            }
-          })
+          const mapped: Pegawai[] = (items || []).map((p: any) => normalizePegawaiFromApi(p, reloadKey))
 
           const departemenFromApi: string[] = json?.filter_options?.departemen ?? []
           const statusFromApi: string[] = json?.filter_options?.status ?? []
@@ -210,6 +242,22 @@ export default function PegawaiPage() {
     putField('departemen', updatedPegawai.departemen)
     putField('tanggalMasuk', updatedPegawai.tanggalMasuk)
 
+    // Identitas Resmi
+    putField('nik', updatedPegawai.identitasResmi?.nik)
+    putField('noBpjs', updatedPegawai.identitasResmi?.noBpjs)
+    putField('noNpwp', updatedPegawai.identitasResmi?.noNpwp)
+    putField('karpeg', updatedPegawai.identitasResmi?.karpeg)
+    putField('karsuKarsi', updatedPegawai.identitasResmi?.karsuKarsi)
+    putField('taspen', updatedPegawai.identitasResmi?.taspen)
+
+    // Kepegawaian
+    putField('statusPegawai', updatedPegawai.kepegawaian?.statusPegawai)
+    putField('jenisPegawai', updatedPegawai.kepegawaian?.jenisPegawai || updatedPegawai.departemen)
+    putField('tmtCpns', updatedPegawai.kepegawaian?.tmtCpns)
+    putField('tmtPns', updatedPegawai.kepegawaian?.tmtPns)
+    putField('masaKerjaTahun', updatedPegawai.kepegawaian?.masaKerjaTahun)
+    putField('masaKerjaBulan', updatedPegawai.kepegawaian?.masaKerjaBulan)
+
     if (fotoFile) {
       formData.append('foto', fotoFile)
     }
@@ -269,47 +317,53 @@ export default function PegawaiPage() {
     setReloadKey((v) => v + 1)
   }
 
-  const handleAddEmployee = async (newPegawai: Pegawai, dokumen: Dokumen[]) => {
-    const payload: any = {
-      nipPegawai: newPegawai.nipPegawai,
-      nama: newPegawai.nama,
-      gelarDepan: newPegawai.gelarDepan,
-      gelarBelakang: newPegawai.gelarBelakang,
-      tempatLahir: newPegawai.tempatLahir,
-      tanggalLahir: newPegawai.tanggalLahir,
-      jenisKelamin: newPegawai.jenisKelamin,
-      agama: newPegawai.agama,
-      alamat: newPegawai.alamat,
-      email: newPegawai.email,
-      noHp: newPegawai.noHp,
-      jabatan: newPegawai.jabatan,
-      golongan: newPegawai.golongan,
-      status: newPegawai.status,
-      departemen: newPegawai.departemen,
-      tanggalMasuk: newPegawai.tanggalMasuk,
-      // identitas resmi
-      nik: newPegawai.identitasResmi?.nik,
-      noBpjs: newPegawai.identitasResmi?.noBpjs,
-      noNpwp: newPegawai.identitasResmi?.noNpwp,
-      karpeg: newPegawai.identitasResmi?.karpeg,
-      karsuKarsi: newPegawai.identitasResmi?.karsuKarsi,
-      taspen: newPegawai.identitasResmi?.taspen,
-      // kepegawaian
-      statusPegawai: newPegawai.kepegawaian?.statusPegawai,
-      jenisPegawai: newPegawai.kepegawaian?.jenisPegawai,
-      tmtCpns: newPegawai.kepegawaian?.tmtCpns,
-      tmtPns: newPegawai.kepegawaian?.tmtPns,
-      masaKerjaTahun: newPegawai.kepegawaian?.masaKerjaTahun ?? 0,
-      masaKerjaBulan: newPegawai.kepegawaian?.masaKerjaBulan ?? 0,
+  const handleAddEmployee = async (newPegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => {
+    const formData = new FormData()
+
+    const put = (key: string, val: any) => {
+      if (val === undefined || val === null) return
+      formData.append(key, String(val))
+    }
+
+    put('nipPegawai', newPegawai.nipPegawai)
+    put('nama', newPegawai.nama)
+    put('gelarDepan', newPegawai.gelarDepan)
+    put('gelarBelakang', newPegawai.gelarBelakang)
+    put('tempatLahir', newPegawai.tempatLahir)
+    put('tanggalLahir', newPegawai.tanggalLahir)
+    put('jenisKelamin', newPegawai.jenisKelamin)
+    put('agama', newPegawai.agama)
+    put('alamat', newPegawai.alamat)
+    put('email', newPegawai.email)
+    put('noHp', newPegawai.noHp)
+    put('jabatan', newPegawai.jabatan)
+    put('golongan', newPegawai.golongan)
+    put('status', newPegawai.status)
+    put('departemen', newPegawai.departemen)
+    put('tanggalMasuk', newPegawai.tanggalMasuk)
+    // identitas resmi
+    put('nik', newPegawai.identitasResmi?.nik)
+    put('noBpjs', newPegawai.identitasResmi?.noBpjs)
+    put('noNpwp', newPegawai.identitasResmi?.noNpwp)
+    put('karpeg', newPegawai.identitasResmi?.karpeg)
+    put('karsuKarsi', newPegawai.identitasResmi?.karsuKarsi)
+    put('taspen', newPegawai.identitasResmi?.taspen)
+    // kepegawaian
+    put('statusPegawai', newPegawai.kepegawaian?.statusPegawai)
+    put('jenisPegawai', newPegawai.kepegawaian?.jenisPegawai)
+    put('tmtCpns', newPegawai.kepegawaian?.tmtCpns)
+    put('tmtPns', newPegawai.kepegawaian?.tmtPns)
+    put('masaKerjaTahun', newPegawai.kepegawaian?.masaKerjaTahun ?? 0)
+    put('masaKerjaBulan', newPegawai.kepegawaian?.masaKerjaBulan ?? 0)
+
+    if (fotoFile) {
+      formData.append('foto', fotoFile)
     }
 
     const res = await fetch(`${apiBase}/api/pegawai`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       credentials: 'include',
-      body: JSON.stringify(payload),
+      body: formData,
     })
 
     if (!res.ok) {
