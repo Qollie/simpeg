@@ -107,7 +107,7 @@ export default function LoginPage() {
                   htmlFor="password"
                   className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
                 >
-                  Password
+                  Password (Minimal 6 karakter)
                 </label>
                 <input
                   type="password"
