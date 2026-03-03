@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button"
 import { UserPlus, Users } from "lucide-react"
 import type { Pegawai, Dokumen } from "@/lib/types"
 
+const apiBase = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") ?? ""
+
 export default function PegawaiPage() {
   const [pegawaiList, setPegawaiList] = useState<Pegawai[]>([])
   const [departemenOptions, setDepartemenOptions] = useState<string[]>(["Semua"])
@@ -64,7 +66,7 @@ export default function PegawaiPage() {
         if (status && status !== 'Semua') params.set('status', status)
       if (searchQuery) params.set('q', searchQuery)
 
-      fetch('/api/pegawai?' + params.toString())
+      fetch(`${apiBase}/api/pegawai?` + params.toString(), { credentials: 'include' })
         .then((r) => r.json())
         .then((json) => {
           const items = json.data ?? json
@@ -214,8 +216,9 @@ export default function PegawaiPage() {
 
     formData.append('_method', 'PUT')
 
-    const response = await fetch(`/api/pegawai/${updatedPegawai.nipPegawai}`, {
+    const response = await fetch(`${apiBase}/api/pegawai/${updatedPegawai.nipPegawai}`, {
       method: 'POST',
+      credentials: 'include',
       body: formData,
     })
 
@@ -227,11 +230,12 @@ export default function PegawaiPage() {
   }
 
   const handleEditDocument = async (pegawaiId: string, dokumenId: string, namaFile: string) => {
-    const response = await fetch(`/api/documents/${dokumenId}`, {
+    const response = await fetch(`${apiBase}/api/documents/${dokumenId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({ namaFile }),
     })
 
@@ -243,8 +247,9 @@ export default function PegawaiPage() {
   }
 
   const handleDeleteDocument = async (pegawaiId: string, dokumenId: string) => {
-    const response = await fetch(`/api/documents/${dokumenId}`, {
+    const response = await fetch(`${apiBase}/api/documents/${dokumenId}`, {
       method: 'DELETE',
+      credentials: 'include',
     })
 
     if (!response.ok) {
@@ -264,8 +269,69 @@ export default function PegawaiPage() {
     setReloadKey((v) => v + 1)
   }
 
-  const handleAddEmployee = (newPegawai: Pegawai, dokumen: Dokumen[]) => {
-    setPegawaiList((prev) => [...prev, newPegawai])
+  const handleAddEmployee = async (newPegawai: Pegawai, dokumen: Dokumen[]) => {
+    const payload: any = {
+      nipPegawai: newPegawai.nipPegawai,
+      nama: newPegawai.nama,
+      gelarDepan: newPegawai.gelarDepan,
+      gelarBelakang: newPegawai.gelarBelakang,
+      tempatLahir: newPegawai.tempatLahir,
+      tanggalLahir: newPegawai.tanggalLahir,
+      jenisKelamin: newPegawai.jenisKelamin,
+      agama: newPegawai.agama,
+      alamat: newPegawai.alamat,
+      email: newPegawai.email,
+      noHp: newPegawai.noHp,
+      jabatan: newPegawai.jabatan,
+      golongan: newPegawai.golongan,
+      status: newPegawai.status,
+      departemen: newPegawai.departemen,
+      tanggalMasuk: newPegawai.tanggalMasuk,
+      // identitas resmi
+      nik: newPegawai.identitasResmi?.nik,
+      noBpjs: newPegawai.identitasResmi?.noBpjs,
+      noNpwp: newPegawai.identitasResmi?.noNpwp,
+      karpeg: newPegawai.identitasResmi?.karpeg,
+      karsuKarsi: newPegawai.identitasResmi?.karsuKarsi,
+      taspen: newPegawai.identitasResmi?.taspen,
+      // kepegawaian
+      statusPegawai: newPegawai.kepegawaian?.statusPegawai,
+      jenisPegawai: newPegawai.kepegawaian?.jenisPegawai,
+      tmtCpns: newPegawai.kepegawaian?.tmtCpns,
+      tmtPns: newPegawai.kepegawaian?.tmtPns,
+      masaKerjaTahun: newPegawai.kepegawaian?.masaKerjaTahun ?? 0,
+      masaKerjaBulan: newPegawai.kepegawaian?.masaKerjaBulan ?? 0,
+    }
+
+    const res = await fetch(`${apiBase}/api/pegawai`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    })
+
+    if (!res.ok) {
+      let msg = 'Periksa data dan coba lagi.'
+      try {
+        const txt = await res.text()
+        msg = txt
+        try {
+          const err = JSON.parse(txt)
+          msg = err?.message || JSON.stringify(err)
+        } catch {}
+        console.error('POST /api/pegawai failed', res.status, res.statusText, txt)
+      } catch {}
+      toast({
+        title: 'Gagal menambah pegawai',
+        description: msg,
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setReloadKey((v) => v + 1)
     setAddModal(false)
   }
 
@@ -276,8 +342,9 @@ export default function PegawaiPage() {
       formData.append('jenisDokumen', (file.type?.split('/')[1] || 'FILE').toUpperCase())
       formData.append('namaFile', file.name)
 
-      const response = await fetch(`/api/pegawai/${pegawaiId}/documents`, {
+      const response = await fetch(`${apiBase}/api/pegawai/${pegawaiId}/documents`, {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       })
 
@@ -293,18 +360,40 @@ export default function PegawaiPage() {
       setDeleteDialog({ isOpen: true, pegawaiId, pegawaiNama })
     }
 
-    const handleConfirmDelete = () => {
-      if (deleteDialog.pegawaiId) {
-        setPegawaiList((prev) =>
-          prev.filter((p) => p.nipPegawai !== deleteDialog.pegawaiId)
-        )
+    const handleConfirmDelete = async () => {
+      if (!deleteDialog.pegawaiId) return
+
+      const res = await fetch(`${apiBase}/api/pegawai/${deleteDialog.pegawaiId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!res.ok) {
+        let msg = "Terjadi kesalahan saat menghapus pegawai."
+        try {
+          const err = await res.json()
+          msg = err?.message || JSON.stringify(err)
+        } catch {}
         toast({
-          title: "Pegawai dihapus",
-          description: `${deleteDialog.pegawaiNama} telah dihapus dari daftar pegawai.`,
+          title: "Gagal menghapus",
+          description: msg,
           variant: "destructive",
         })
-        setDeleteDialog({ isOpen: false, pegawaiId: null, pegawaiNama: "" })
+        return
       }
+
+      // Optimistic update + refetch
+      setPegawaiList((prev) =>
+        prev.filter((p) => p.nipPegawai !== deleteDialog.pegawaiId)
+      )
+      setReloadKey((v) => v + 1)
+
+      toast({
+        title: "Pegawai dihapus",
+        description: `${deleteDialog.pegawaiNama} telah dihapus dari daftar pegawai.`,
+        variant: "destructive",
+      })
+      setDeleteDialog({ isOpen: false, pegawaiId: null, pegawaiNama: "" })
     }
   const resetFilters = () => {
     setSearchQuery("")
@@ -390,6 +479,7 @@ export default function PegawaiPage() {
           isOpen={editModal.isOpen}
           onClose={() => setEditModal({ isOpen: false, pegawai: null })}
           onSave={handleSaveEdit}
+          existingPegawai={pegawaiList}
         />
 
         <EditDocumentModal
@@ -411,6 +501,7 @@ export default function PegawaiPage() {
           isOpen={addModal}
           onClose={() => setAddModal(false)}
           onAdd={handleAddEmployee}
+          existingPegawai={pegawaiList}
         />
 
           {/* Delete Confirmation Dialog */}

@@ -16,9 +16,11 @@ Route::prefix('api')->withoutMiddleware([ValidateCsrfToken::class])->group(funct
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
         Route::get('pegawai', [PegawaiController::class, 'index']);
+        Route::post('pegawai', [PegawaiController::class, 'store']);
         Route::get('pegawai/{id}', [PegawaiController::class, 'show']);
         Route::post('pegawai/{id}', [PegawaiController::class, 'update']);
         Route::put('pegawai/{id}', [PegawaiController::class, 'update']);
+        Route::delete('pegawai/{id}', [PegawaiController::class, 'destroy']);
         Route::post('pegawai/{id}/documents', [PegawaiController::class, 'uploadDocument']);
         Route::patch('documents/{id}', [PegawaiController::class, 'renameDocument']);
         Route::delete('documents/{id}', [PegawaiController::class, 'deleteDocument']);

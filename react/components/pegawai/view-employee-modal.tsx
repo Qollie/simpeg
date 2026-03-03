@@ -13,7 +13,6 @@ import {
   FileText,
   X,
   Briefcase,
-  Trash2,
   CreditCard,
   MapPin,
   IdCard,
@@ -129,16 +128,16 @@ export function ModalLihatPegawai({
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               
               {/* IDENTITAS RESMI */}
-              {(pegawai.identitasResmi?.nik || pegawai.identitasResmi?.noBpjs || pegawai.identitasResmi?.noNpwp) && (
+              {(pegawai.identitasResmi || pegawai.nipPegawai) && (
                 <div>
                   <SectionTitle title="Identitas Resmi" icon={IdCard} />
                   <div className="space-y-0">
                     <DataRow label="NIK" value={pegawai.identitasResmi?.nik} />
-                    <DataRow label="NO. BPJS" value={pegawai.identitasResmi?.noBpjs} />
-                    <DataRow label="NO. NPWP" value={pegawai.identitasResmi?.noNpwp} />
-                    {pegawai.identitasResmi?.karpeg && <DataRow label="KARPEG" value={pegawai.identitasResmi.karpeg} />}
-                    {pegawai.identitasResmi?.karsuKarsi && <DataRow label="KARSU/KARSI" value={pegawai.identitasResmi.karsuKarsi} />}
-                    {pegawai.identitasResmi?.taspen && <DataRow label="TASPEN" value={pegawai.identitasResmi.taspen} />}
+                    <DataRow label="No. BPJS" value={pegawai.identitasResmi?.noBpjs} />
+                    <DataRow label="No. NPWP" value={pegawai.identitasResmi?.noNpwp} />
+                    <DataRow label="Karpeg" value={pegawai.identitasResmi?.karpeg} />
+                    <DataRow label="Karsu/Karsi" value={pegawai.identitasResmi?.karsuKarsi} />
+                    <DataRow label="Taspen" value={pegawai.identitasResmi?.taspen} />
                   </div>
                 </div>
               )}
@@ -234,17 +233,6 @@ export function ModalLihatPegawai({
                             <span>{formatDate(file.waktuUpload)}</span>
                           </div>
                         </div>
-                        {hapusDokumen && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => hapusDokumen(pegawai.nipPegawai, String(file.idFile))}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                     ))}
                   </div>

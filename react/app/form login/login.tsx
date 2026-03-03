@@ -21,26 +21,34 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const body = new URLSearchParams({ username, password });
+
+      // Use relative path so Vite dev proxy handles CORS correctly
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
         },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
+        body,
       });
 
       if (!response.ok) {
-        throw new Error('Login gagal');
+        const detail = await response.text();
+        throw new Error(
+          `Login gagal (${response.status}) ${detail || ""}`.trim()
+        );
       }
 
       const json = await response.json();
       setAuth({ token: json.token, user: json.user });
       navigate("/");
-    } catch {
-      setError("Username atau password salah.");
+    } catch (err: any) {
+      setError(
+        err?.message?.includes("Username atau password salah")
+          ? "Username atau password salah."
+          : "Login gagal. Pastikan server API aktif dan kredensial benar."
+      );
     } finally {
       setLoading(false);
     }
@@ -50,9 +58,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col relative">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop" 
-          alt="Kantor Disdukcapil" 
+        <img
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
+          alt="Kantor Disdukcapil"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/60" />
@@ -62,7 +70,9 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4 relative z-10">
         <div className="w-full mx-auto max-w-md">
           <div className="rounded-lg border border-white/20 bg-black/40 backdrop-blur-2xl p-4 sm:p-8 shadow-2xl transition-all duration-300 hover:scale-[1.01]">
-            <h1 className="mb-2 text-xl sm:text-2xl font-bold text-center text-white">Masuk ke Sistem</h1>
+            <h1 className="mb-2 text-xl sm:text-2xl font-bold text-center text-white">
+              Masuk ke Sistem
+            </h1>
             <p className="mb-4 sm:mb-6 text-center text-xs sm:text-sm text-white/80">
               Masukkan kredensial Anda untuk melanjutkan
             </p>
@@ -75,7 +85,10 @@ export default function LoginPage() {
               )}
 
               <div>
-                <label htmlFor="username" className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
+                <label
+                  htmlFor="username"
+                  className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
+                >
                   Username / Email
                 </label>
                 <input
@@ -90,7 +103,10 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label htmlFor="password" className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
+                <label
+                  htmlFor="password"
+                  className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
+                >
                   Password
                 </label>
                 <input
