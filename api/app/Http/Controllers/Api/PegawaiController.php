@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EfilePegawai;
 use App\Models\Kepegawaian;
 use App\Models\IdentitasResmi;
+use App\Models\Pangkat;
 use App\Models\Pegawai;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -79,10 +80,18 @@ class PegawaiController extends Controller
             ->filter()
             ->values();
 
+        $pangkatOptions = Pangkat::query()
+            ->selectRaw("CONCAT(\"pangkat\", ' (', \"golongan\", '/', \"ruang\", ')') as value")
+            ->orderBy('urutan')
+            ->pluck('value')
+            ->filter()
+            ->values();
+
         $payload = $result->toArray();
         $payload['filter_options'] = [
             'departemen' => $departemenOptions,
             'status' => $statusOptions,
+            'pangkat' => $pangkatOptions,
         ];
 
         return response()->json($payload);

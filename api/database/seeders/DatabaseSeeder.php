@@ -24,9 +24,14 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password')
         ]);
 
-        // seed sample pegawai
-        $this->call([
-            PegawaiSeeder::class,
-        ]);
+        $seeders = [
+            PangkatSeeder::class,
+        ];
+
+        if (class_exists(PegawaiSeeder::class)) {
+            $seeders[] = PegawaiSeeder::class;
+        }
+
+        $this->call($seeders);
     }
 }

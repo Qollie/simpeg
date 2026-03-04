@@ -11,6 +11,7 @@ Route::get('/', function () {
 });
 
 Route::prefix('api')->withoutMiddleware([ValidateCsrfToken::class])->group(function () {
+    Route::get('auth/challenge', [AuthController::class, 'challenge']);
     Route::post('auth/login', [AuthController::class, 'login']);
     Route::middleware('api.auth')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
