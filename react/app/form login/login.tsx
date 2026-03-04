@@ -95,8 +95,8 @@ export default function LoginPage() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/bg-login.jpeg"
-          alt="Kantor Disdukcapil"
+          src="/storage/login/bgLogin.jpeg"
+          alt="Kantor Disdukcapil Samarinda"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/60" />
