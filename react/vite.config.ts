@@ -22,6 +22,11 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (p) => p.replace(/^\/api/, "/api"),
         },
+        "/storage": {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
   }

@@ -6,13 +6,43 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [challengeId, setChallengeId] = useState("");
+  const [challengeQuestion, setChallengeQuestion] = useState("");
+  const [challengeAnswer, setChallengeAnswer] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingChallenge, setLoadingChallenge] = useState(false);
+
+  const loadChallenge = async () => {
+    setLoadingChallenge(true);
+    try {
+      const response = await fetch("/api/auth/challenge", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error("Gagal memuat captcha");
+      }
+
+      const json = await response.json();
+      setChallengeId(json.challenge_id || "");
+      setChallengeQuestion(json.question || "");
+      setChallengeAnswer("");
+    } catch {
+      setChallengeId("");
+      setChallengeQuestion("");
+      setError("Gagal memuat captcha. Muat ulang halaman.");
+    } finally {
+      setLoadingChallenge(false);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated()) {
       navigate("/");
     }
+    loadChallenge();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,7 +51,12 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const body = new URLSearchParams({ username, password });
+      const body = new URLSearchParams({
+        username,
+        password,
+        challenge_id: challengeId,
+        challenge_answer: challengeAnswer,
+      });
 
       // Use relative path so Vite dev proxy handles CORS correctly
       const response = await fetch("/api/auth/login", {
@@ -49,6 +84,7 @@ export default function LoginPage() {
           ? "Username atau password salah."
           : "Login gagal. Pastikan server API aktif dan kredensial benar."
       );
+      await loadChallenge();
     } finally {
       setLoading(false);
     }
@@ -59,8 +95,8 @@ export default function LoginPage() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <img
-          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop"
-          alt="Kantor Disdukcapil"
+          src="/storage/login/bgLogin.jpeg"
+          alt="Kantor Disdukcapil Samarinda"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/60" />
@@ -107,7 +143,7 @@ export default function LoginPage() {
                   htmlFor="password"
                   className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
                 >
-                  Password
+                  Password (Minimal 6 karakter)
                 </label>
                 <input
                   type="password"
@@ -120,9 +156,33 @@ export default function LoginPage() {
                 />
               </div>
 
+              <div>
+                <label
+                  htmlFor="captcha"
+                  className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
+                >
+                  Verifikasi Human
+                </label>
+                <div className="mb-2 rounded-md border border-white/20 bg-black/60 px-3 py-2 text-sm text-white">
+                  {loadingChallenge
+                    ? "Memuat captcha..."
+                    : challengeQuestion || "Captcha tidak tersedia"}
+                </div>
+                <input
+                  type="number"
+                  id="captcha"
+                  value={challengeAnswer}
+                  onChange={(e) => setChallengeAnswer(e.target.value)}
+                  placeholder="Masukkan hasil perkalian"
+                  className="w-full rounded-md border border-white/20 bg-black/60 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  required
+                  disabled={loadingChallenge || !challengeId}
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || loadingChallenge || !challengeId}
                 className="w-full rounded-md bg-primary py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-opacity"
               >
                 {loading ? "Memproses..." : "Login"}

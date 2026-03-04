@@ -118,6 +118,7 @@ export default function PegawaiPage() {
   const [pegawaiList, setPegawaiList] = useState<Pegawai[]>([])
   const [departemenOptions, setDepartemenOptions] = useState<string[]>(["Semua"])
   const [statusOptions, setStatusOptions] = useState<string[]>(["Semua"])
+  const [pangkatOptions, setPangkatOptions] = useState<string[]>([])
   const [reloadKey, setReloadKey] = useState(0)
   const [page, setPage] = useState(1)
   const [perPage] = useState(10)
@@ -166,12 +167,14 @@ export default function PegawaiPage() {
 
           const departemenFromApi: string[] = json?.filter_options?.departemen ?? []
           const statusFromApi: string[] = json?.filter_options?.status ?? []
+          const pangkatFromApi: string[] = json?.filter_options?.pangkat ?? []
 
           if (mounted) {
             setPegawaiList(mapped)
             setLastPage(json.last_page ?? 1)
             setDepartemenOptions(['Semua', ...departemenFromApi])
             setStatusOptions(['Semua', ...statusFromApi])
+            setPangkatOptions(pangkatFromApi)
           }
         })
         .catch(() => {})
@@ -556,6 +559,7 @@ export default function PegawaiPage() {
           onClose={() => setAddModal(false)}
           onAdd={handleAddEmployee}
           existingPegawai={pegawaiList}
+          golonganOptions={pangkatOptions}
         />
 
           {/* Delete Confirmation Dialog */}

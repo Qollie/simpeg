@@ -27,6 +27,7 @@ interface AddEmployeeModalProps {
   onClose: () => void
   onAdd: (pegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => void
   existingPegawai?: Pegawai[]
+  golonganOptions?: string[]
 }
 
 const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"]
@@ -101,6 +102,7 @@ export function AddEmployeeModal({
   onClose,
   onAdd,
   existingPegawai = [],
+  golonganOptions = [],
 }: AddEmployeeModalProps) {
   const [formData, setFormData] = useState<FormState>(initialForm)
 
@@ -418,7 +420,7 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih golongan" />
                   </SelectTrigger>
                   <SelectContent>
-                    {golonganList.map((gol) => (
+                    {(golonganOptions.length > 0 ? golonganOptions : golonganList).map((gol) => (
                       <SelectItem key={gol} value={gol}>
                         {gol}
                       </SelectItem>
