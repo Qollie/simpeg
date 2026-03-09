@@ -12,6 +12,7 @@ import {
 import { ModalLihatPegawai } from "@/components/pegawai/view-employee-modal"
 import type { Pegawai } from "@/lib/types"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Download } from "lucide-react"
 
 const DEFAULT_PAGINATION: PaginationMeta = {
   currentPage: 1,
@@ -56,6 +58,7 @@ const mapPegawaiForModal = (p: any): Pegawai => {
 export default function KarirPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [satyaStatus, setSatyaStatus] = useState("semua")
+  const [nearYears, setNearYears] = useState("1")
   const [perPage, setPerPage] = useState("10")
 
   const [promotionPage, setPromotionPage] = useState(1)
@@ -69,6 +72,12 @@ export default function KarirPage() {
 
   const [promotionPagination, setPromotionPagination] = useState<PaginationMeta>(DEFAULT_PAGINATION)
   const [satyaPagination, setSatyaPagination] = useState<PaginationMeta>(DEFAULT_PAGINATION)
+  const [careerSummary, setCareerSummary] = useState({
+    promotionTotal: 0,
+    satyalancanaTotal: 0,
+    satyalancanaMemenuhi: 0,
+    satyalancanaMendekati: 0,
+  })
 
   const [modalLihat, setModalLihat] = useState<{
     terbuka: boolean
@@ -79,7 +88,7 @@ export default function KarirPage() {
   useEffect(() => {
     setPromotionPage(1)
     setSatyaPage(1)
-  }, [searchQuery, satyaStatus, perPage])
+  }, [searchQuery, satyaStatus, nearYears, perPage])
 
   useEffect(() => {
     let mounted = true
@@ -87,6 +96,7 @@ export default function KarirPage() {
     params.set("page", String(promotionPage))
     params.set("per_page", perPage)
     if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    params.set("near_years", nearYears)
 
     setPromotionLoading(true)
 
@@ -113,7 +123,7 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [promotionPage, perPage, searchQuery])
+  }, [promotionPage, perPage, nearYears, searchQuery])
 
   useEffect(() => {
     let mounted = true
@@ -122,6 +132,7 @@ export default function KarirPage() {
     params.set("per_page", perPage)
     if (searchQuery.trim()) params.set("q", searchQuery.trim())
     if (satyaStatus !== "semua") params.set("status", satyaStatus)
+    params.set("near_years", nearYears)
 
     setSatyaLoading(true)
 
@@ -148,7 +159,40 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [satyaPage, perPage, satyaStatus, searchQuery])
+  }, [satyaPage, perPage, satyaStatus, nearYears, searchQuery])
+
+  useEffect(() => {
+    let mounted = true
+
+    const params = new URLSearchParams()
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    params.set("near_years", nearYears)
+
+    fetch(`/api/karir/summary?${params.toString()}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!mounted) return
+        setCareerSummary({
+          promotionTotal: json.promotionTotal ?? 0,
+          satyalancanaTotal: json.satyalancanaTotal ?? 0,
+          satyalancanaMemenuhi: json.satyalancanaMemenuhi ?? 0,
+          satyalancanaMendekati: json.satyalancanaMendekati ?? 0,
+        })
+      })
+      .catch(() => {
+        if (!mounted) return
+        setCareerSummary({
+          promotionTotal: 0,
+          satyalancanaTotal: 0,
+          satyalancanaMemenuhi: 0,
+          satyalancanaMendekati: 0,
+        })
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [searchQuery, nearYears])
 
   const handleLihatDetail = (nip: string, konteks: "promosi" | "satyalancana") => {
     fetch(`/api/pegawai/${nip}`)
@@ -163,14 +207,31 @@ export default function KarirPage() {
   }
 
   const summaryText = useMemo(() => {
-    return `Naik pangkat: ${promotionPagination.total} pegawai | Satyalancana: ${satyaPagination.total} pegawai`
-  }, [promotionPagination.total, satyaPagination.total])
+    return `Naik pangkat: ${careerSummary.promotionTotal} pegawai | Satyalancana: ${careerSummary.satyalancanaTotal} pegawai`
+  }, [careerSummary.promotionTotal, careerSummary.satyalancanaTotal])
+
+  const handleDownloadPromotionCsv = () => {
+    const params = new URLSearchParams()
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    params.set("near_years", nearYears)
+
+    window.open(`/api/karir/naik-pangkat/export?${params.toString()}`, "_blank")
+  }
+
+  const handleDownloadSatyaCsv = () => {
+    const params = new URLSearchParams()
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    if (satyaStatus !== "semua") params.set("status", satyaStatus)
+    params.set("near_years", nearYears)
+
+    window.open(`/api/karir/satyalancana/export?${params.toString()}`, "_blank")
+  }
 
   return (
     <AdminLayout title="Peningkatan Karir">
       <div className="space-y-4 md:space-y-6">
         <div className="rounded-lg border border-border/60 bg-card p-3 md:p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <Input
               placeholder="Cari nama, NIP, atau jabatan..."
               value={searchQuery}
@@ -196,6 +257,42 @@ export default function KarirPage() {
                 <SelectItem value="50">50 per halaman</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={nearYears} onValueChange={setNearYears}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Rentang mendekati" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Mendekati: maksimal 1 tahun</SelectItem>
+                <SelectItem value="2">Mendekati: maksimal 2 tahun</SelectItem>
+                <SelectItem value="3">Mendekati: maksimal 3 tahun</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="text-[10px] text-muted-foreground">Layak Naik Pangkat</p>
+              <p className="text-sm font-semibold">{careerSummary.promotionTotal}</p>
+            </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="text-[10px] text-muted-foreground">Satyalancana Total</p>
+              <p className="text-sm font-semibold">{careerSummary.satyalancanaTotal}</p>
+            </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="text-[10px] text-muted-foreground">Satyalancana Memenuhi</p>
+              <p className="text-sm font-semibold">{careerSummary.satyalancanaMemenuhi}</p>
+            </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="text-[10px] text-muted-foreground">Satyalancana Mendekati</p>
+              <p className="text-sm font-semibold">{careerSummary.satyalancanaMendekati}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadPromotionCsv}>
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Unduh CSV Naik Pangkat
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadSatyaCsv}>
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Unduh CSV Satyalancana
+            </Button>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">{summaryText}</p>
         </div>

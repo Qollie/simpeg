@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Pegawai;
-use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CareerController extends Controller
 {
@@ -22,62 +21,38 @@ class CareerController extends Controller
         'S3' => 'Pembina Utama (IV/e)',
     ];
 
-    private const MILESTONE_SATYA = [10, 20, 30];
+    private const URUTAN_GOLONGAN = [
+        'Juru Muda (I/a)',
+        'Juru Muda Tingkat I (I/b)',
+        'Juru (I/c)',
+        'Juru Tingkat I (I/d)',
+        'Pengatur Muda (II/a)',
+        'Pengatur Muda Tingkat I (II/b)',
+        'Pengatur (II/c)',
+        'Pengatur Tingkat I (II/d)',
+        'Penata Muda (III/a)',
+        'Penata Muda Tingkat I (III/b)',
+        'Penata (III/c)',
+        'Penata Tingkat I (III/d)',
+        'Pembina (IV/a)',
+        'Pembina Tingkat I (IV/b)',
+        'Pembina Utama Muda (IV/c)',
+        'Pembina Utama Madya (IV/d)',
+        'Pembina Utama (IV/e)',
+    ];
 
     public function promotionEligibility(Request $request)
     {
         $perPage = max(1, min((int) $request->query('per_page', 10), 100));
-        $page = max(1, (int) $request->query('page', 1));
-        $q = trim((string) $request->query('q', ''));
-        $pendidikanDefault = $this->normalisasiPendidikan((string) $request->query('default_pendidikan', 'S1'));
+        $pendidikan = $this->normalisasiPendidikan((string) $request->query('default_pendidikan', 'S1'));
+        $maxRankOrder = $this->golonganOrder(self::BATAS_PANGKAT_PENDIDIKAN[$pendidikan] ?? 'Pembina (IV/a)');
 
-        $query = Pegawai::query()->with([
-            'kepegawaian',
-            'riwayatPangkatTerbaru.pangkat',
-        ]);
+        $query = $this->promotionBaseQuery($request, $maxRankOrder);
 
-        if ($q !== '') {
-            $query->where(function ($sub) use ($q) {
-                $sub->where('nama', 'ilike', "%{$q}%")
-                    ->orWhere('nipPegawai', 'ilike', "%{$q}%")
-                    ->orWhere('jabatan', 'ilike', "%{$q}%");
-            });
-        }
-
-        $items = $query
+        $paginated = $query
+            ->orderByDesc(DB::raw('(masaKerjaGolonganTahun * 12 + masaKerjaGolonganBulan)'))
             ->orderBy('nama')
-            ->get()
-            ->map(function (Pegawai $pegawai) use ($pendidikanDefault) {
-                $statusAktif = $this->statusAktif($pegawai);
-                $pendidikan = $pendidikanDefault;
-                $golonganSaatIni = $this->getGolonganSaatIni($pegawai);
-                $maxRankReached = $this->isMaxRankReached($golonganSaatIni, $pendidikan);
-                $tmtGolongan = $this->getTmtGolonganAktif($pegawai);
-                $masaKerja = $this->hitungMasaKerja($tmtGolongan);
-                $eligibleDate = $this->calculateEligibleDate($tmtGolongan, 4);
-                $layak = $statusAktif && !$maxRankReached && $eligibleDate !== null && now()->greaterThanOrEqualTo($eligibleDate);
-
-                return [
-                    'nipPegawai' => $pegawai->nipPegawai,
-                    'nama' => $pegawai->nama,
-                    'jabatan' => $pegawai->jabatan,
-                    'golongan' => $golonganSaatIni,
-                    'status' => $pegawai->status,
-                    'tmtGolonganAktif' => $tmtGolongan,
-                    'masaKerjaGolonganTahun' => $masaKerja['tahun'],
-                    'masaKerjaGolonganBulan' => $masaKerja['bulan'],
-                    'eligibleDate' => $eligibleDate?->toDateString(),
-                    'pendidikan' => $pendidikan,
-                    'layakNaikPangkat' => $layak,
-                ];
-            })
-            ->filter(fn (array $item) => $item['layakNaikPangkat'])
-            ->sortByDesc(function (array $item) {
-                return ($item['masaKerjaGolonganTahun'] * 12) + $item['masaKerjaGolonganBulan'];
-            })
-            ->values();
-
-        $paginated = $this->paginateCollection($items, $page, $perPage);
+            ->paginate($perPage);
 
         return response()->json([
             'data' => $paginated->items(),
@@ -91,88 +66,20 @@ class CareerController extends Controller
     public function satyalancana(Request $request)
     {
         $perPage = max(1, min((int) $request->query('per_page', 10), 100));
-        $page = max(1, (int) $request->query('page', 1));
-        $q = trim((string) $request->query('q', ''));
-        $statusFilter = strtolower(trim((string) $request->query('status', 'semua')));
         $nearYears = max(1, min((int) $request->query('near_years', 1), 3));
+        $statusFilter = strtolower(trim((string) $request->query('status', 'semua')));
 
-        $query = Pegawai::query()->with([
-            'kepegawaian',
-            'riwayatPangkatTerbaru.pangkat',
-        ]);
+        $query = $this->satyalancanaBaseQuery($request, $nearYears);
 
-        if ($q !== '') {
-            $query->where(function ($sub) use ($q) {
-                $sub->where('nama', 'ilike', "%{$q}%")
-                    ->orWhere('nipPegawai', 'ilike', "%{$q}%")
-                    ->orWhere('jabatan', 'ilike', "%{$q}%");
-            });
+        if (in_array($statusFilter, ['memenuhi', 'mendekati'], true)) {
+            $query->where('statusSatya', $statusFilter);
         }
 
-        $items = $query
+        $paginated = $query
+            ->orderByRaw("CASE WHEN statusSatya = 'memenuhi' THEN 1 ELSE 0 END DESC")
+            ->orderByDesc(DB::raw('(masaKerjaTahun * 12 + masaKerjaBulan)'))
             ->orderBy('nama')
-            ->get()
-            ->map(function (Pegawai $pegawai) use ($nearYears) {
-                if (!$this->statusAktif($pegawai)) {
-                    return null;
-                }
-
-                $tmtMasuk = $pegawai->tanggalMasuk
-                    ?? $pegawai->kepegawaian?->tmtCpns
-                    ?? $pegawai->kepegawaian?->tmtPns;
-
-                $masaKerja = $this->hitungMasaKerja($tmtMasuk);
-                $tercapai = collect(self::MILESTONE_SATYA)->filter(fn (int $m) => $masaKerja['tahun'] >= $m)->last();
-                $berikutnya = collect(self::MILESTONE_SATYA)->first(fn (int $m) => $masaKerja['tahun'] < $m);
-
-                $statusSatya = 'belum';
-                $kategoriSatya = null;
-                $milestoneTarget = null;
-
-                if ($tercapai !== null) {
-                    $statusSatya = 'memenuhi';
-                    $kategoriSatya = sprintf('%d Tahun', $tercapai);
-                    $milestoneTarget = (int) $tercapai;
-                } elseif ($berikutnya !== null && ($berikutnya - $masaKerja['tahun']) <= $nearYears) {
-                    $statusSatya = 'mendekati';
-                    $kategoriSatya = sprintf('Menuju %d Tahun', $berikutnya);
-                    $milestoneTarget = (int) $berikutnya;
-                }
-
-                if ($statusSatya === 'belum') {
-                    return null;
-                }
-
-                return [
-                    'nipPegawai' => $pegawai->nipPegawai,
-                    'nama' => $pegawai->nama,
-                    'jabatan' => $pegawai->jabatan,
-                    'golongan' => $this->getGolonganSaatIni($pegawai),
-                    'status' => $pegawai->status,
-                    'tanggalMasuk' => $tmtMasuk,
-                    'masaKerjaTahun' => $masaKerja['tahun'],
-                    'masaKerjaBulan' => $masaKerja['bulan'],
-                    'statusSatya' => $statusSatya,
-                    'kategoriSatya' => $kategoriSatya,
-                    'milestoneTarget' => $milestoneTarget,
-                ];
-            })
-            ->filter()
-            ->filter(function (array $item) use ($statusFilter) {
-                if (!in_array($statusFilter, ['memenuhi', 'mendekati'], true)) {
-                    return true;
-                }
-
-                return $item['statusSatya'] === $statusFilter;
-            })
-            ->sortByDesc(function (array $item) {
-                $statusWeight = $item['statusSatya'] === 'memenuhi' ? 1 : 0;
-
-                return ($statusWeight * 10000) + (($item['masaKerjaTahun'] * 12) + $item['masaKerjaBulan']);
-            })
-            ->values();
-
-        $paginated = $this->paginateCollection($items, $page, $perPage);
+            ->paginate($perPage);
 
         return response()->json([
             'data' => $paginated->items(),
@@ -186,79 +93,240 @@ class CareerController extends Controller
         ]);
     }
 
-    private function paginateCollection(Collection $collection, int $page, int $perPage): LengthAwarePaginator
+    public function summary(Request $request)
     {
-        $total = $collection->count();
-        $slice = $collection->forPage($page, $perPage)->values();
+        $pendidikan = $this->normalisasiPendidikan((string) $request->query('default_pendidikan', 'S1'));
+        $maxRankOrder = $this->golonganOrder(self::BATAS_PANGKAT_PENDIDIKAN[$pendidikan] ?? 'Pembina (IV/a)');
+        $nearYears = max(1, min((int) $request->query('near_years', 1), 3));
 
-        return new LengthAwarePaginator(
-            $slice,
-            $total,
-            $perPage,
-            $page,
-            ['path' => request()->url(), 'query' => request()->query()]
-        );
+        $promotionTotal = (clone $this->promotionBaseQuery($request, $maxRankOrder))->count();
+
+        $satyaBase = $this->satyalancanaBaseQuery($request, $nearYears);
+        $satyaMemenuhi = (clone $satyaBase)->where('statusSatya', 'memenuhi')->count();
+        $satyaMendekati = (clone $satyaBase)->where('statusSatya', 'mendekati')->count();
+
+        return response()->json([
+            'promotionTotal' => $promotionTotal,
+            'satyalancanaTotal' => $satyaMemenuhi + $satyaMendekati,
+            'satyalancanaMemenuhi' => $satyaMemenuhi,
+            'satyalancanaMendekati' => $satyaMendekati,
+        ]);
     }
 
-    private function statusAktif(Pegawai $pegawai): bool
+    public function exportPromotionCsv(Request $request): StreamedResponse
     {
-        $raw = trim((string) ($pegawai->status ?? $pegawai->kepegawaian?->statusPegawai ?? 'Aktif'));
-        if ($raw === '') {
-            return true;
-        }
+        $pendidikan = $this->normalisasiPendidikan((string) $request->query('default_pendidikan', 'S1'));
+        $maxRankOrder = $this->golonganOrder(self::BATAS_PANGKAT_PENDIDIKAN[$pendidikan] ?? 'Pembina (IV/a)');
 
-        return !in_array(strtolower($raw), self::STATUS_NON_AKTIF, true);
+        $rows = $this->promotionBaseQuery($request, $maxRankOrder)
+            ->orderByDesc(DB::raw('(masaKerjaGolonganTahun * 12 + masaKerjaGolonganBulan)'))
+            ->orderBy('nama')
+            ->get();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['NIP', 'Nama', 'Jabatan', 'Golongan', 'TMT Golongan', 'Masa Kerja Golongan (Tahun)', 'Masa Kerja Golongan (Bulan)', 'Layak Sejak']);
+
+            foreach ($rows as $row) {
+                fputcsv($out, [
+                    $row->nipPegawai,
+                    $row->nama,
+                    $row->jabatan,
+                    $row->golongan,
+                    $row->tmtGolonganAktif,
+                    $row->masaKerjaGolonganTahun,
+                    $row->masaKerjaGolonganBulan,
+                    $row->eligibleDate,
+                ]);
+            }
+
+            fclose($out);
+        }, 'karir-naik-pangkat.csv', ['Content-Type' => 'text/csv']);
     }
 
-    private function getTmtGolonganAktif(Pegawai $pegawai): ?string
+    public function exportSatyalancanaCsv(Request $request): StreamedResponse
     {
-        return $pegawai->riwayatPangkatTerbaru?->tmtPangkat
-            ?? $pegawai->tanggalMasuk
-            ?? $pegawai->kepegawaian?->tmtCpns
-            ?? $pegawai->kepegawaian?->tmtPns;
+        $nearYears = max(1, min((int) $request->query('near_years', 1), 3));
+        $statusFilter = strtolower(trim((string) $request->query('status', 'semua')));
+
+        $query = $this->satyalancanaBaseQuery($request, $nearYears);
+        if (in_array($statusFilter, ['memenuhi', 'mendekati'], true)) {
+            $query->where('statusSatya', $statusFilter);
+        }
+
+        $rows = $query
+            ->orderByRaw("CASE WHEN statusSatya = 'memenuhi' THEN 1 ELSE 0 END DESC")
+            ->orderByDesc(DB::raw('(masaKerjaTahun * 12 + masaKerjaBulan)'))
+            ->orderBy('nama')
+            ->get();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['NIP', 'Nama', 'Jabatan', 'Golongan', 'Tanggal Masuk', 'Masa Kerja (Tahun)', 'Masa Kerja (Bulan)', 'Status Satyalancana', 'Kategori']);
+
+            foreach ($rows as $row) {
+                fputcsv($out, [
+                    $row->nipPegawai,
+                    $row->nama,
+                    $row->jabatan,
+                    $row->golongan,
+                    $row->tanggalMasuk,
+                    $row->masaKerjaTahun,
+                    $row->masaKerjaBulan,
+                    $row->statusSatya,
+                    $row->kategoriSatya,
+                ]);
+            }
+
+            fclose($out);
+        }, 'karir-satyalancana.csv', ['Content-Type' => 'text/csv']);
     }
 
-    private function getGolonganSaatIni(Pegawai $pegawai): ?string
+    private function promotionBaseQuery(Request $request, int $maxRankOrder): Builder
     {
-        if ($pegawai->riwayatPangkatTerbaru?->pangkat) {
-            $pangkat = $pegawai->riwayatPangkatTerbaru->pangkat;
-            return trim(sprintf('%s (%s)', $pangkat->pangkat ?? '', $pangkat->golongan ?? ''));
+        $q = trim((string) $request->query('q', ''));
+
+        $query = DB::query()->fromSub($this->pegawaiBaseQuery($request), 'b')
+            ->select([
+                'b.nipPegawai',
+                'b.nama',
+                'b.jabatan',
+                'b.golongan',
+                'b.tmtGolonganAktif',
+                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.tmtGolonganAktif::date))::int as masaKerjaGolonganTahun"),
+                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.tmtGolonganAktif::date))::int as masaKerjaGolonganBulan"),
+                DB::raw("(b.tmtGolonganAktif::date + interval '4 years')::date as eligibleDate"),
+            ])
+            ->whereNotNull('b.tmtGolonganAktif')
+            ->whereRaw("(b.tmtGolonganAktif::date + interval '4 years')::date <= CURRENT_DATE")
+            ->where(function ($sub) use ($maxRankOrder) {
+                $sub->where('b.rankOrder', 0)
+                    ->orWhere('b.rankOrder', '<', $maxRankOrder);
+            });
+
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('b.nama', 'ilike', "%{$q}%")
+                    ->orWhere('b.nipPegawai', 'ilike', "%{$q}%")
+                    ->orWhere('b.jabatan', 'ilike', "%{$q}%");
+            });
         }
 
-        return $pegawai->golongan;
+        return $query;
     }
 
-    private function hitungMasaKerja(?string $tanggalAwal): array
+    private function satyalancanaBaseQuery(Request $request, int $nearYears): Builder
     {
-        if (!$tanggalAwal) {
-            return ['tahun' => 0, 'bulan' => 0];
+        $q = trim((string) $request->query('q', ''));
+
+        $withTenure = DB::query()->fromSub($this->pegawaiBaseQuery($request), 'b')
+            ->select([
+                'b.nipPegawai',
+                'b.nama',
+                'b.jabatan',
+                'b.golongan',
+                'b.tanggalMasuk',
+                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.tanggalMasuk::date))::int as masaKerjaTahun"),
+                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.tanggalMasuk::date))::int as masaKerjaBulan"),
+            ])
+            ->whereNotNull('b.tanggalMasuk');
+
+        $query = DB::query()->fromSub($withTenure, 't')
+            ->select([
+                't.nipPegawai',
+                't.nama',
+                't.jabatan',
+                't.golongan',
+                't.tanggalMasuk',
+                't.masaKerjaTahun',
+                't.masaKerjaBulan',
+                DB::raw(
+                    "CASE
+                        WHEN t.masaKerjaTahun >= 30 THEN 'memenuhi'
+                        WHEN t.masaKerjaTahun >= 20 THEN 'memenuhi'
+                        WHEN t.masaKerjaTahun >= 10 THEN 'memenuhi'
+                        WHEN t.masaKerjaTahun >= (30 - {$nearYears}) THEN 'mendekati'
+                        WHEN t.masaKerjaTahun >= (20 - {$nearYears}) THEN 'mendekati'
+                        WHEN t.masaKerjaTahun >= (10 - {$nearYears}) THEN 'mendekati'
+                        ELSE 'belum'
+                    END as statusSatya"
+                ),
+                DB::raw(
+                    "CASE
+                        WHEN t.masaKerjaTahun >= 30 THEN '30 Tahun'
+                        WHEN t.masaKerjaTahun >= 20 THEN '20 Tahun'
+                        WHEN t.masaKerjaTahun >= 10 THEN '10 Tahun'
+                        WHEN t.masaKerjaTahun >= (30 - {$nearYears}) THEN 'Menuju 30 Tahun'
+                        WHEN t.masaKerjaTahun >= (20 - {$nearYears}) THEN 'Menuju 20 Tahun'
+                        WHEN t.masaKerjaTahun >= (10 - {$nearYears}) THEN 'Menuju 10 Tahun'
+                        ELSE NULL
+                    END as kategoriSatya"
+                ),
+            ])
+            ->whereRaw(
+                "CASE
+                    WHEN t.masaKerjaTahun >= 30 THEN 'memenuhi'
+                    WHEN t.masaKerjaTahun >= 20 THEN 'memenuhi'
+                    WHEN t.masaKerjaTahun >= 10 THEN 'memenuhi'
+                    WHEN t.masaKerjaTahun >= (30 - {$nearYears}) THEN 'mendekati'
+                    WHEN t.masaKerjaTahun >= (20 - {$nearYears}) THEN 'mendekati'
+                    WHEN t.masaKerjaTahun >= (10 - {$nearYears}) THEN 'mendekati'
+                    ELSE 'belum'
+                END <> 'belum'"
+            );
+
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('t.nama', 'ilike', "%{$q}%")
+                    ->orWhere('t.nipPegawai', 'ilike', "%{$q}%")
+                    ->orWhere('t.jabatan', 'ilike', "%{$q}%");
+            });
         }
 
-        try {
-            $mulai = Carbon::parse($tanggalAwal);
-        } catch (\Throwable $e) {
-            return ['tahun' => 0, 'bulan' => 0];
-        }
-
-        $sekarang = now();
-        $tahun = $mulai->diffInYears($sekarang);
-        $anchor = $mulai->copy()->addYears($tahun);
-        $bulan = $anchor->diffInMonths($sekarang);
-
-        return ['tahun' => $tahun, 'bulan' => $bulan];
+        return $query;
     }
 
-    private function calculateEligibleDate(?string $tanggalAwal, int $tahun): ?\Illuminate\Support\Carbon
+    private function pegawaiBaseQuery(Request $request): Builder
     {
-        if (!$tanggalAwal) {
-            return null;
+        $latestRankSub = DB::table('RiwayatPangkat as rp')
+            ->selectRaw('rp."nipRiwayat", MAX(rp."tmtPangkat") as latest_tmt')
+            ->groupBy('rp.nipRiwayat');
+
+        $statusRaw = 'LOWER(COALESCE(NULLIF(TRIM(p."status"), \'\'), NULLIF(TRIM(k."statusPegawai"), \'\'), \'aktif\'))';
+
+        return DB::table('Pegawai as p')
+            ->leftJoin('Kepegawaian as k', 'k.nipKepegawaian', '=', 'p.nipPegawai')
+            ->leftJoinSub($latestRankSub, 'lr', function ($join) {
+                $join->on('lr.nipRiwayat', '=', 'p.nipPegawai');
+            })
+            ->leftJoin('RiwayatPangkat as rp', function ($join) {
+                $join->on('rp.nipRiwayat', '=', 'lr.nipRiwayat')
+                    ->on('rp.tmtPangkat', '=', 'lr.latest_tmt');
+            })
+            ->leftJoin('Pangkat as pg', 'pg.idPangkat', '=', 'rp.idPangkatRiwayat')
+            ->select([
+                'p.nipPegawai',
+                'p.nama',
+                'p.jabatan',
+                DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan) as golongan"),
+                DB::raw("COALESCE(rp.\"tmtPangkat\", p.\"tanggalMasuk\", k.\"tmtCpns\", k.\"tmtPns\") as \"tmtGolonganAktif\""),
+                DB::raw("COALESCE(p.\"tanggalMasuk\", k.\"tmtCpns\", k.\"tmtPns\") as \"tanggalMasuk\""),
+                DB::raw($this->rankCaseExpression("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan)") . ' as "rankOrder"'),
+            ])
+            ->whereRaw($statusRaw . " NOT IN ('cuti','pensiun','nonaktif','resign')");
+    }
+
+    private function rankCaseExpression(string $columnExpr): string
+    {
+        $cases = [];
+
+        foreach (self::URUTAN_GOLONGAN as $idx => $value) {
+            $order = $idx + 1;
+            $escaped = str_replace("'", "''", $value);
+            $cases[] = "WHEN {$columnExpr} = '{$escaped}' THEN {$order}";
         }
 
-        try {
-            return Carbon::parse($tanggalAwal)->addYears($tahun);
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return 'CASE ' . implode(' ', $cases) . ' ELSE 0 END';
     }
 
     private function normalisasiPendidikan(string $pendidikan): string
@@ -276,43 +344,14 @@ class CareerController extends Controller
         };
     }
 
-    private function isMaxRankReached(?string $golonganSaatIni, string $pendidikan): bool
+    private function golonganOrder(string $golongan): int
     {
-        if (!$golonganSaatIni) {
-            return false;
+        $index = array_search($golongan, self::URUTAN_GOLONGAN, true);
+
+        if ($index === false) {
+            return 0;
         }
 
-        if (!array_key_exists($pendidikan, self::BATAS_PANGKAT_PENDIDIKAN)) {
-            return false;
-        }
-
-        $urutanGolongan = [
-            'Juru Muda (I/a)',
-            'Juru Muda Tingkat I (I/b)',
-            'Juru (I/c)',
-            'Juru Tingkat I (I/d)',
-            'Pengatur Muda (II/a)',
-            'Pengatur Muda Tingkat I (II/b)',
-            'Pengatur (II/c)',
-            'Pengatur Tingkat I (II/d)',
-            'Penata Muda (III/a)',
-            'Penata Muda Tingkat I (III/b)',
-            'Penata (III/c)',
-            'Penata Tingkat I (III/d)',
-            'Pembina (IV/a)',
-            'Pembina Tingkat I (IV/b)',
-            'Pembina Utama Muda (IV/c)',
-            'Pembina Utama Madya (IV/d)',
-            'Pembina Utama (IV/e)',
-        ];
-
-        $currentIndex = array_search($golonganSaatIni, $urutanGolongan, true);
-        $maxIndex = array_search(self::BATAS_PANGKAT_PENDIDIKAN[$pendidikan], $urutanGolongan, true);
-
-        if ($currentIndex === false || $maxIndex === false) {
-            return false;
-        }
-
-        return $currentIndex >= $maxIndex;
+        return $index + 1;
     }
 }
