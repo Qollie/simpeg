@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -15,7 +16,14 @@ class AuthController extends Controller
         $validated = $request->validate([
             'username' => ['required', 'string'],
             'password' => ['required', 'string'],
+            'turnstile_token' => ['required', 'string'],
         ]);
+
+        if (!$this->verifyTurnstile($validated['turnstile_token'], $request->ip())) {
+            return response()->json([
+                'message' => 'Verifikasi captcha gagal. Silakan coba lagi.',
+            ], 422);
+        }
 
         $user = User::query()
             ->where('email', $validated['username'])
@@ -56,5 +64,34 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Logout berhasil.',
         ]);
+    }
+
+    private function verifyTurnstile(string $token, ?string $ip): bool
+    {
+        $secret = config('services.turnstile.secret');
+
+        if (!$secret) {
+            return false;
+        }
+
+        try {
+            $response = Http::asForm()
+                ->timeout(8)
+                ->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
+                    'secret' => $secret,
+                    'response' => $token,
+                    'remoteip' => $ip,
+                ]);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        if (!$response->ok()) {
+            return false;
+        }
+
+        $data = $response->json();
+
+        return (bool) ($data['success'] ?? false);
     }
 }

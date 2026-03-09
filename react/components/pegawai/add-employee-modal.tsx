@@ -19,68 +19,95 @@ import {
 } from "@/components/ui/select"
 import { Upload, X, Camera, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import type { Pegawai, Dokumen } from "@/lib/types"
-import { departemenList, golonganList } from "@/lib/mock-data"
+import type { Pegawai, Dokumen, EfilePegawai } from "@/lib/types"
+import { departemenList, golonganList, statusList } from "@/lib/mock-data"
 
 interface AddEmployeeModalProps {
   isOpen: boolean
   onClose: () => void
-  onAdd: (pegawai: Pegawai, dokumen: Dokumen[]) => void
+  onAdd: (pegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => void
+  existingPegawai?: Pegawai[]
+  golonganOptions?: string[]
 }
 
 const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"]
-const statusPerkawinanList = ["Belum Menikah", "Menikah", "Cerai Hidup", "Cerai Mati"]
 const jenisKelaminList = ["Laki-laki", "Perempuan"]
+const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
+const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
 
-const pendidikanList = [
-  { label: "SD", min: "I/a", max: "II/a" },
-  { label: "SLTP", min: "I/c", max: "II/c" },
-  { label: "SLTP Kejuruan", min: "I/c", max: "II/d" },
-  { label: "SLTA/SLTA Kejuruan/Diploma", min: "II/a", max: "III/b" },
-  { label: "Diploma II", min: "II/b", max: "III/b" },
-  { label: "SGPLB", min: "II/b", max: "III/c" },
-  { label: "Sarjana Muda / D-III", min: "II/c", max: "III/c" },
-  { label: "Sarjana/D-IV", min: "III/a", max: "III/d" },
-  { label: "S-2 / Dokter / Apoteker / Ners", min: "III/b", max: "IV/a" },
-  { label: "S-3 / Doktor", min: "III/c", max: "IV/b" },
-]
+type FormState = {
+  nipPegawai: string
+  nama: string
+  gelarDepan: string
+  gelarBelakang: string
+  jabatan: string
+  departemen: string
+  golongan: string
+  status: "Aktif" | "Cuti" | "Pensiun"
+  tanggalMasuk: string
+  email: string
+  noHp: string
+  tempatLahir: string
+  tanggalLahir: string
+  jenisKelamin: string
+  agama: string
+  alamat: string
+  nik: string
+  noBpjs: string
+  noNpwp: string
+  karpeg: string
+  karsuKarsi: string
+  taspen: string
+  statusPegawai: string
+  jenisPegawai: string
+  tmtCpns: string
+  tmtPns: string
+  masaKerjaTahun: string
+  masaKerjaBulan: string
+}
+
+const initialForm: FormState = {
+  nipPegawai: "",
+  nama: "",
+  gelarDepan: "",
+  gelarBelakang: "",
+  jabatan: "",
+  departemen: "",
+  golongan: "",
+  status: "Aktif",
+  tanggalMasuk: "",
+  email: "",
+  noHp: "",
+  tempatLahir: "",
+  tanggalLahir: "",
+  jenisKelamin: "",
+  agama: "",
+  alamat: "",
+  nik: "",
+  noBpjs: "",
+  noNpwp: "",
+  karpeg: "",
+  karsuKarsi: "",
+  taspen: "",
+  statusPegawai: "",
+  jenisPegawai: "",
+  tmtCpns: "",
+  tmtPns: "",
+  masaKerjaTahun: "",
+  masaKerjaBulan: "",
+}
 
 export function AddEmployeeModal({
   isOpen,
   onClose,
   onAdd,
+  existingPegawai = [],
+  golonganOptions = [],
 }: AddEmployeeModalProps) {
-  const [formData, setFormData] = useState({
-    nip: "",
-    nik: "",
-    nama: "",
-    gelarDepan: "",
-    gelarBelakang: "",
-    jabatan: "",
-    departemen: "",
-    golongan: "",
-    status: "Aktif",
-    tanggalMasuk: "",
-    tmtGolongan: "",
-    email: "",
-    telepon: "",
-    tempatLahir: "",
-    tanggalLahir: "",
-    jenisKelamin: "",
-    agama: "",
-    statusPerkawinan: "",
-    alamat: "",
-    provinsi: "",
-    kota: "",
-    kecamatan: "",
-    kodePos: "",
-    pendidikanTerakhir: "",
-    noBpjs: "",
-    noNpwp: "",
-  })
+  const [formData, setFormData] = useState<FormState>(initialForm)
 
   const [dokumen, setDokumen] = useState<File[]>([])
-  const [foto, setFoto] = useState<File | null>(null)
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -108,7 +135,7 @@ export function AddEmployeeModal({
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
-      setFoto(file)
+      setFotoFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
         setFotoPreview(reader.result as string)
@@ -118,104 +145,132 @@ export function AddEmployeeModal({
   }
 
   const handleSubmit = () => {
-    if (
-      !formData.nip ||
-      !formData.nama ||
-      !formData.jabatan ||
-      !formData.departemen ||
-      !formData.golongan ||
-      !formData.email ||
-      !formData.telepon ||
-      !formData.tanggalLahir ||
-      !formData.jenisKelamin
-    ) {
+    const requiredFields: (keyof FormState)[] = [
+      "nipPegawai",
+      "nama",
+      "jabatan",
+      "tempatLahir",
+      "tanggalLahir",
+      "jenisKelamin",
+      "noHp",
+      "email",
+      "nik",
+      "departemen",
+      "golongan",
+      "status",
+      "statusPegawai",
+      "jenisPegawai",
+      "tanggalMasuk",
+      "agama",
+      "tmtCpns",
+      "masaKerjaTahun",
+      "masaKerjaBulan",
+    ]
+
+    const missing = requiredFields.filter((field) => !`${formData[field]}`.trim())
+    if (missing.length > 0) {
       toast({
         title: "Validasi Gagal",
-        description: "Harap isi semua field yang wajib diisi (ditandai dengan *)",
+        description: "Harap isi semua field wajib bertanda * sesuai kolom database.",
         variant: "destructive",
       })
       return
     }
 
-    // Generate ID untuk pegawai baru
-    const newId = Date.now().toString()
+    // Uniqueness validation against existing data
+    const duplicates: string[] = []
+    const normalizedEmail = formData.email?.trim().toLowerCase()
+
+    existingPegawai.forEach((p) => {
+      const ident = p.identitasResmi
+      if (formData.nipPegawai && p.nipPegawai === formData.nipPegawai) duplicates.push("NIP")
+      if (normalizedEmail && p.email && p.email.toLowerCase() === normalizedEmail) duplicates.push("Email")
+      if (!ident) return
+      if (formData.nik && ident.nik === formData.nik) duplicates.push("NIK")
+      if (formData.noBpjs && ident.noBpjs === formData.noBpjs) duplicates.push("No. BPJS")
+      if (formData.noNpwp && ident.noNpwp === formData.noNpwp) duplicates.push("No. NPWP")
+      if (formData.karpeg && ident.karpeg === formData.karpeg) duplicates.push("Karpeg")
+      if (formData.karsuKarsi && ident.karsuKarsi === formData.karsuKarsi) duplicates.push("Karsu/Karsi")
+      if (formData.taspen && ident.taspen === formData.taspen) duplicates.push("Taspen")
+    })
+
+    if (duplicates.length > 0) {
+      const uniq = Array.from(new Set(duplicates))
+      toast({
+        title: "Kode sudah digunakan",
+        description: `Kolom ${uniq.join(", ")} tidak boleh sama dengan pegawai lain.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const timestamp = Date.now()
 
     // Convert dokumen files menjadi Dokumen objects
-    const dokumenObjects: Dokumen[] = dokumen.map((file) => ({
-      id: Date.now().toString() + Math.random(),
+    const dokumenObjects: Dokumen[] = dokumen.map((file, index) => ({
+      id: `${timestamp}-${index}`,
       nama: file.name,
-      tipe: file.type.split("/")[1].toUpperCase(),
+      tipe: (file.type.split("/")[1] || "").toUpperCase(),
       ukuran: (file.size / (1024 * 1024)).toFixed(2) + " MB",
       tanggalUpload: new Date().toISOString().split("T")[0],
     }))
 
-    const newPegawai: any = {
-      id: newId,
-      nip: formData.nip,
-      nik: formData.nik,
+    const efiles: EfilePegawai[] = dokumenObjects.map((doc, index) => ({
+      idFile: index + 1,
+      nipEfile: formData.nipPegawai,
+      jenisDokumen: doc.tipe,
+      namaFile: doc.nama,
+      filePath: doc.url ?? "",
+      waktuUpload: doc.tanggalUpload,
+    }))
+
+    const newPegawai: Pegawai = {
+      nipPegawai: formData.nipPegawai,
       nama: formData.nama,
-      gelarDepan: formData.gelarDepan,
-      gelarBelakang: formData.gelarBelakang,
-      jabatan: formData.jabatan,
-      departemen: formData.departemen,
-      golongan: formData.golongan,
-      status: formData.status as "Aktif" | "Cuti" | "Pensiun",
-      tanggalMasuk: formData.tanggalMasuk,
-      tmtGolongan: formData.tmtGolongan,
-      email: formData.email,
-      telepon: formData.telepon,
+      gelarDepan: formData.gelarDepan || undefined,
+      gelarBelakang: formData.gelarBelakang || undefined,
+      jabatan: formData.jabatan || undefined,
+      departemen: formData.departemen || undefined,
+      golongan: formData.golongan || undefined,
+      status: formData.status,
+      tanggalMasuk: formData.tanggalMasuk || undefined,
+      email: formData.email || undefined,
+      noHp: formData.noHp,
+      foto: fotoPreview || undefined,
       tempatLahir: formData.tempatLahir,
       tanggalLahir: formData.tanggalLahir,
       jenisKelamin: formData.jenisKelamin,
-      agama: formData.agama,
-      statusPerkawinan: formData.statusPerkawinan,
-      alamat: formData.alamat,
-      provinsi: formData.provinsi,
-      kota: formData.kota,
-      kecamatan: formData.kecamatan,
-      kodePos: formData.kodePos,
-      dokumen: dokumenObjects,
-      foto: fotoPreview,
-      pendidikanTerakhir: formData.pendidikanTerakhir,
-      noBpjs: formData.noBpjs,
-      noNpwp: formData.noNpwp,
+      agama: formData.agama || undefined,
+      alamat: formData.alamat || undefined,
+      identitasResmi: {
+        nipIdResmi: formData.nipPegawai,
+        nik: formData.nik || undefined,
+        noBpjs: formData.noBpjs || undefined,
+        noNpwp: formData.noNpwp || undefined,
+        karpeg: formData.karpeg || undefined,
+        karsuKarsi: formData.karsuKarsi || undefined,
+        taspen: formData.taspen || undefined,
+      },
+      kepegawaian: {
+        nipKepegawaian: formData.nipPegawai,
+        statusPegawai: formData.statusPegawai,
+        jenisPegawai: formData.jenisPegawai,
+        tmtCpns: formData.tmtCpns || undefined,
+        tmtPns: formData.tmtPns || undefined,
+        masaKerjaTahun: Number(formData.masaKerjaTahun),
+        masaKerjaBulan: Number(formData.masaKerjaBulan),
+      },
+      efiles,
     }
 
-    onAdd(newPegawai, dokumenObjects)
+    onAdd(newPegawai, dokumenObjects, fotoFile)
     resetForm()
   }
 
   const resetForm = () => {
-    setFormData({
-      nip: "",
-      nik: "",
-      nama: "",
-      gelarDepan: "",
-      gelarBelakang: "",
-      jabatan: "",
-      departemen: "",
-      golongan: "",
-      status: "Aktif",
-      tanggalMasuk: "",
-      tmtGolongan: "",
-      email: "",
-      telepon: "",
-      tempatLahir: "",
-      tanggalLahir: "",
-      jenisKelamin: "",
-      agama: "",
-      statusPerkawinan: "",
-      alamat: "",
-      provinsi: "",
-      kota: "",
-      kecamatan: "",
-      kodePos: "",
-      pendidikanTerakhir: "",
-      noBpjs: "",
-      noNpwp: "",
-    })
+    setFormData(initialForm)
     setDokumen([])
-    setFoto(null)
+    setFotoFile(null)
     setFotoPreview(null)
     onClose()
   }
@@ -257,35 +312,35 @@ export function AddEmployeeModal({
             <h3 className="text-base font-semibold text-foreground">Identitas Pegawai</h3>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="nip" className="text-sm">
+                <Label htmlFor="nipPegawai" className="text-sm">
                   NIP <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="nip"
-                  name="nip"
+                  id="nipPegawai"
+                  name="nipPegawai"
                   placeholder="Nomor Induk Pegawai"
-                  value={formData.nip}
+                  value={formData.nipPegawai}
                   onChange={handleInputChange}
                   className="bg-secondary text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="nik" className="text-sm">
-                  NIK
+                <Label htmlFor="nama" className="text-sm">
+                  Nama Lengkap <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="nik"
-                  name="nik"
-                  placeholder="Nomor Induk Kependudukan"
-                  value={formData.nik}
+                  id="nama"
+                  name="nama"
+                  placeholder="Nama lengkap"
+                  value={formData.nama}
                   onChange={handleInputChange}
                   className="bg-secondary text-sm"
                 />
               </div>
             </div>
 
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-              <div className="space-y-2 sm:col-span-1">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-2">
                 <Label htmlFor="gelarDepan" className="text-sm">
                   Gelar Depan
                 </Label>
@@ -298,20 +353,7 @@ export function AddEmployeeModal({
                   className="bg-secondary text-sm"
                 />
               </div>
-              <div className="space-y-1.5 sm:space-y-2 sm:col-span-2">
-                <Label htmlFor="nama" className="text-xs sm:text-sm">
-                  Nama Lengkap <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="nama"
-                  name="nama"
-                  placeholder="Nama lengkap"
-                  value={formData.nama}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-1">
+              <div className="space-y-2">
                 <Label htmlFor="gelarBelakang" className="text-sm">
                   Gelar Belakang
                 </Label>
@@ -378,7 +420,7 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih golongan" />
                   </SelectTrigger>
                   <SelectContent>
-                    {golonganList.map((gol) => (
+                    {(golonganOptions.length > 0 ? golonganOptions : golonganList).map((gol) => (
                       <SelectItem key={gol} value={gol}>
                         {gol}
                       </SelectItem>
@@ -386,54 +428,42 @@ export function AddEmployeeModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="pendidikanTerakhir" className="text-xs sm:text-sm">
-                  Pendidikan Terakhir
+            </div>
+
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="status" className="text-sm">
+                  Status Pegawai Internal <span className="text-destructive">*</span>
                 </Label>
                 <Select
-                  value={formData.pendidikanTerakhir}
-                  onValueChange={(value) => handleSelectChange("pendidikanTerakhir", value)}
+                  value={formData.status}
+                  onValueChange={(value) => handleSelectChange("status", value)}
                 >
-                  <SelectTrigger className="w-full bg-secondary text-sm">
-                    <SelectValue placeholder="Pilih Pendidikan" />
+                  <SelectTrigger className="bg-secondary text-sm">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {pendidikanList.map((p) => (
-                      <SelectItem key={p.label} value={p.label}>{p.label} ({p.min} - {p.max})</SelectItem>
+                    {statusList.slice(1).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </div>
-
-          {/* Identitas Resmi Tambahan */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="noBpjs" className="text-sm">
-                No. BPJS
-              </Label>
-              <Input
-                id="noBpjs"
-                name="noBpjs"
-                placeholder="Nomor BPJS"
-                value={formData.noBpjs}
-                onChange={handleInputChange}
-                className="bg-secondary text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="noNpwp" className="text-sm">
-                No. NPWP
-              </Label>
-              <Input
-                id="noNpwp"
-                name="noNpwp"
-                placeholder="Nomor NPWP"
-                value={formData.noNpwp}
-                onChange={handleInputChange}
-                className="bg-secondary text-sm"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="tanggalMasuk" className="text-sm">
+                  Tanggal Masuk <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="tanggalMasuk"
+                  name="tanggalMasuk"
+                  type="date"
+                  value={formData.tanggalMasuk}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
             </div>
           </div>
 
@@ -443,7 +473,7 @@ export function AddEmployeeModal({
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="tempatLahir" className="text-sm">
-                  Tempat Lahir
+                  Tempat Lahir <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="tempatLahir"
@@ -469,7 +499,7 @@ export function AddEmployeeModal({
               </div>
             </div>
 
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="jenisKelamin" className="text-sm">
                   Jenis Kelamin <span className="text-destructive">*</span>
@@ -489,7 +519,7 @@ export function AddEmployeeModal({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="agama" className="text-sm">Agama</Label>
+                <Label htmlFor="agama" className="text-sm">Agama <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.agama}
                   onValueChange={(value) => handleSelectChange("agama", value)}
@@ -504,30 +534,10 @@ export function AddEmployeeModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="statusPerkawinan" className="text-sm">Status Perkawinan</Label>
-                <Select
-                  value={formData.statusPerkawinan}
-                  onValueChange={(value) => handleSelectChange("statusPerkawinan", value)}
-                >
-                  <SelectTrigger className="bg-secondary text-sm">
-                    <SelectValue placeholder="Pilih" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusPerkawinanList.map((sp) => (
-                      <SelectItem key={sp} value={sp}>{sp}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
-          </div>
 
-          {/* Alamat Domisili Section */}
-          <div className="space-y-4">
-            <h3 className="text-base font-semibold text-foreground">Alamat Domisili</h3>
             <div className="space-y-2">
-              <Label htmlFor="alamat" className="text-sm">Alamat Lengkap (Jalan, RT/RW)</Label>
+              <Label htmlFor="alamat" className="text-sm">Alamat Lengkap</Label>
               <Input
                 id="alamat"
                 name="alamat"
@@ -536,99 +546,6 @@ export function AddEmployeeModal({
                 onChange={handleInputChange}
                 className="bg-secondary text-sm"
               />
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="provinsi" className="text-sm">Provinsi</Label>
-                <Input
-                  id="provinsi"
-                  name="provinsi"
-                  value={formData.provinsi}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kota" className="text-sm">Kota/Kabupaten</Label>
-                <Input
-                  id="kota"
-                  name="kota"
-                  value={formData.kota}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kecamatan" className="text-sm">Kecamatan</Label>
-                <Input
-                  id="kecamatan"
-                  name="kecamatan"
-                  value={formData.kecamatan}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kodePos" className="text-sm">Kode Pos</Label>
-                <Input
-                  id="kodePos"
-                  name="kodePos"
-                  value={formData.kodePos}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Status & Tanggal Section */}
-          <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground">Status & Tanggal</h3>
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="status" className="text-xs sm:text-sm">
-                  Status <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleSelectChange("status", value)}
-                >
-                  <SelectTrigger className="bg-secondary text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Aktif">Aktif</SelectItem>
-                    <SelectItem value="Cuti">Cuti</SelectItem>
-                    <SelectItem value="Pensiun">Pensiun</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="tanggalMasuk" className="text-xs sm:text-sm">
-                  Tanggal Masuk <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="tanggalMasuk"
-                  name="tanggalMasuk"
-                  type="date"
-                  value={formData.tanggalMasuk}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="tmtGolongan" className="text-xs sm:text-sm">
-                  TMT Golongan
-                </Label>
-                <Input
-                  id="tmtGolongan"
-                  name="tmtGolongan"
-                  type="date"
-                  value={formData.tmtGolongan}
-                  onChange={handleInputChange}
-                  className="bg-secondary text-sm"
-                />
-              </div>
             </div>
           </div>
 
@@ -651,14 +568,200 @@ export function AddEmployeeModal({
                 />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="telepon" className="text-xs sm:text-sm">
-                  Telepon <span className="text-destructive">*</span>
+                <Label htmlFor="noHp" className="text-xs sm:text-sm">
+                  No. HP <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="telepon"
-                  name="telepon"
+                  id="noHp"
+                  name="noHp"
                   placeholder="081234567890"
-                  value={formData.telepon}
+                  value={formData.noHp}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Identitas Resmi (Database) */}
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground">Identitas Resmi</h3>
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="nik" className="text-sm">
+                  NIK <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="nik"
+                  name="nik"
+                  placeholder="Nomor Induk Kependudukan"
+                  value={formData.nik}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="noBpjs" className="text-sm">
+                  No. BPJS
+                </Label>
+                <Input
+                  id="noBpjs"
+                  name="noBpjs"
+                  placeholder="Nomor BPJS"
+                  value={formData.noBpjs}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="noNpwp" className="text-sm">
+                  No. NPWP
+                </Label>
+                <Input
+                  id="noNpwp"
+                  name="noNpwp"
+                  placeholder="Nomor NPWP"
+                  value={formData.noNpwp}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="karpeg" className="text-sm">
+                  Karpeg
+                </Label>
+                <Input
+                  id="karpeg"
+                  name="karpeg"
+                  placeholder="Nomor Karpeg"
+                  value={formData.karpeg}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="karsuKarsi" className="text-sm">
+                  Karsu/Karsi
+                </Label>
+                <Input
+                  id="karsuKarsi"
+                  name="karsuKarsi"
+                  placeholder="Nomor Karsu/Karsi"
+                  value={formData.karsuKarsi}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="taspen" className="text-sm">
+                  Taspen
+                </Label>
+                <Input
+                  id="taspen"
+                  name="taspen"
+                  placeholder="Nomor Taspen"
+                  value={formData.taspen}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Kepegawaian Section */}
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground">Data Kepegawaian</h3>
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="statusPegawai" className="text-sm">
+                  Status Pegawai <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.statusPegawai}
+                  onValueChange={(value) => handleSelectChange("statusPegawai", value)}
+                >
+                  <SelectTrigger className="bg-secondary text-sm">
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusKepegawaianList.map((statusItem) => (
+                      <SelectItem key={statusItem} value={statusItem}>
+                        {statusItem}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="jenisPegawai" className="text-sm">
+                  Jenis Pegawai <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.jenisPegawai}
+                  onValueChange={(value) => handleSelectChange("jenisPegawai", value)}
+                >
+                  <SelectTrigger className="bg-secondary text-sm">
+                    <SelectValue placeholder="Pilih jenis pegawai" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jenisPegawaiList.map((jenis) => (
+                      <SelectItem key={jenis} value={jenis}>
+                        {jenis}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tmtCpns" className="text-sm">
+                  TMT CPNS <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="tmtCpns"
+                  name="tmtCpns"
+                  type="date"
+                  value={formData.tmtCpns}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tmtPns" className="text-sm">
+                  TMT PNS
+                </Label>
+                <Input
+                  id="tmtPns"
+                  name="tmtPns"
+                  type="date"
+                  value={formData.tmtPns}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="masaKerjaTahun" className="text-sm">
+                  Masa Kerja (Tahun) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="masaKerjaTahun"
+                  name="masaKerjaTahun"
+                  type="number"
+                  min="0"
+                  value={formData.masaKerjaTahun}
+                  onChange={handleInputChange}
+                  className="bg-secondary text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="masaKerjaBulan" className="text-sm">
+                  Masa Kerja (Bulan) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="masaKerjaBulan"
+                  name="masaKerjaBulan"
+                  type="number"
+                  min="0"
+                  value={formData.masaKerjaBulan}
                   onChange={handleInputChange}
                   className="bg-secondary text-sm"
                 />

@@ -1,6 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setAuth, isAuthenticated } from "@/lib/auth";
+
+type TurnstileRenderOptions = {
+  sitekey: string;
+  callback?: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+  theme?: "light" | "dark" | "auto";
+};
+
+type TurnstileInstance = {
+  render: (
+    elementOrId: HTMLElement | string,
+    options: TurnstileRenderOptions
+  ) => string;
+  reset: (widgetId?: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileInstance;
+  }
+}
+
+const TURNSTILE_SCRIPT_ID = "cf-turnstile-script";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -8,6 +32,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState("");
+  const widgetRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | undefined>();
+  const turnstileSiteKey = import.meta.env
+    .VITE_TURNSTILE_SITE_KEY as string | undefined;
 
   useEffect(() => {
     if (isAuthenticated()) {
@@ -15,32 +46,153 @@ export default function LoginPage() {
     }
   }, [navigate]);
 
+  useEffect(() => {
+    if (!turnstileSiteKey) {
+      setTurnstileError(
+        "Kunci Turnstile belum dikonfigurasi (VITE_TURNSTILE_SITE_KEY)."
+      );
+      return;
+    }
+
+    if (window.turnstile) {
+      setTurnstileReady(true);
+      return;
+    }
+
+    let script = document.getElementById(
+      TURNSTILE_SCRIPT_ID
+    ) as HTMLScriptElement | null;
+
+    const handleLoad = () => setTurnstileReady(true);
+    const handleError = () =>
+      setTurnstileError(
+        "Gagal memuat skrip Cloudflare Turnstile. Periksa koneksi Anda."
+      );
+
+    if (script) {
+      script.addEventListener("load", handleLoad);
+      script.addEventListener("error", handleError);
+      return () => {
+        script?.removeEventListener("load", handleLoad);
+        script?.removeEventListener("error", handleError);
+      };
+    }
+
+    script = document.createElement("script");
+    script.id = TURNSTILE_SCRIPT_ID;
+    script.src =
+      "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
+    document.head.appendChild(script);
+
+    return () => {
+      script?.removeEventListener("load", handleLoad);
+      script?.removeEventListener("error", handleError);
+    };
+  }, [turnstileSiteKey]);
+
+  useEffect(() => {
+    if (
+      !turnstileReady ||
+      !widgetRef.current ||
+      !window.turnstile ||
+      !turnstileSiteKey
+    ) {
+      return;
+    }
+
+    if (widgetIdRef.current) {
+      window.turnstile.reset(widgetIdRef.current);
+      return;
+    }
+
+    widgetIdRef.current = window.turnstile.render(widgetRef.current, {
+      sitekey: turnstileSiteKey,
+      theme: "dark",
+      callback: (token: string) => {
+        setTurnstileToken(token);
+        setTurnstileError("");
+      },
+      "error-callback": () => {
+        setTurnstileToken("");
+        setTurnstileError("Verifikasi captcha gagal. Silakan coba lagi.");
+      },
+      "expired-callback": () => {
+        setTurnstileToken("");
+        setTurnstileError("Captcha kedaluwarsa. Silakan verifikasi ulang.");
+      },
+    });
+  }, [turnstileReady, turnstileSiteKey]);
+
+  const resetTurnstile = () => {
+    if (widgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+    setTurnstileToken("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
+    if (!turnstileSiteKey) {
+      setError(
+        "Captcha belum dikonfigurasi. Set VITE_TURNSTILE_SITE_KEY di frontend."
+      );
+      return;
+    }
+
+    if (!turnstileToken) {
+      setError("Silakan selesaikan captcha terlebih dahulu.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      const body = new URLSearchParams({
+        username,
+        password,
+        turnstile_token: turnstileToken,
+      });
+
+      // Use relative path so Vite dev proxy handles CORS correctly
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
         },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
+        body,
       });
 
       if (!response.ok) {
-        throw new Error('Login gagal');
+        let detail = "";
+        try {
+          const json = await response.json();
+          detail = json?.message ?? "";
+        } catch {
+          detail = await response.text();
+        }
+
+        throw new Error(detail || `Login gagal (${response.status}).`);
       }
 
       const json = await response.json();
       setAuth({ token: json.token, user: json.user });
       navigate("/");
-    } catch {
-      setError("Username atau password salah.");
+    } catch (err: any) {
+      const message =
+        err?.message?.includes("Username atau password salah")
+          ? "Username atau password salah."
+          : err?.message ||
+            "Login gagal. Pastikan server API aktif dan kredensial benar.";
+
+      setError(message);
+      resetTurnstile();
     } finally {
       setLoading(false);
     }
@@ -50,9 +202,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col relative">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop" 
-          alt="Kantor Disdukcapil" 
+        <img
+          src="/storage/login/bgLogin.jpeg"
+          alt="Kantor Disdukcapil Samarinda"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/60" />
@@ -62,7 +214,9 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center p-4 relative z-10">
         <div className="w-full mx-auto max-w-md">
           <div className="rounded-lg border border-white/20 bg-black/40 backdrop-blur-2xl p-4 sm:p-8 shadow-2xl transition-all duration-300 hover:scale-[1.01]">
-            <h1 className="mb-2 text-xl sm:text-2xl font-bold text-center text-white">Masuk ke Sistem</h1>
+            <h1 className="mb-2 text-xl sm:text-2xl font-bold text-center text-white">
+              Masuk ke Sistem
+            </h1>
             <p className="mb-4 sm:mb-6 text-center text-xs sm:text-sm text-white/80">
               Masukkan kredensial Anda untuk melanjutkan
             </p>
@@ -75,7 +229,10 @@ export default function LoginPage() {
               )}
 
               <div>
-                <label htmlFor="username" className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
+                <label
+                  htmlFor="username"
+                  className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
+                >
                   Username / Email
                 </label>
                 <input
@@ -90,8 +247,11 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label htmlFor="password" className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
-                  Password
+                <label
+                  htmlFor="password"
+                  className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
+                >
+                  Password (Minimal 6 karakter)
                 </label>
                 <input
                   type="password"
@@ -104,9 +264,36 @@ export default function LoginPage() {
                 />
               </div>
 
+              <div>
+                <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
+                  Verifikasi Cloudflare
+                </label>
+                <div>
+                  <div
+                    ref={widgetRef}
+                    className="cf-turnstile min-h-[65px]"
+                    data-sitekey={turnstileSiteKey}
+                  >
+                    {!turnstileReady && !turnstileError
+                      ? "Memuat captcha..."
+                      : null}
+                  </div>
+                </div>
+                {turnstileError && (
+                  <p className="mt-2 text-[11px] text-red-200">{turnstileError}</p>
+                )}
+                {!turnstileSiteKey && (
+                  <p className="mt-2 text-[11px] text-amber-200">
+                    Tambahkan VITE_TURNSTILE_SITE_KEY di file .env frontend.
+                  </p>
+                )}
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={
+                  loading || !turnstileToken || !!turnstileError || !turnstileSiteKey
+                }
                 className="w-full rounded-md bg-primary py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-opacity"
               >
                 {loading ? "Memproses..." : "Login"}

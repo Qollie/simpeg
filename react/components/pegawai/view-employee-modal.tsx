@@ -13,7 +13,6 @@ import {
   FileText,
   X,
   Briefcase,
-  Trash2,
   CreditCard,
   MapPin,
   IdCard,
@@ -21,6 +20,7 @@ import {
 } from "lucide-react"
 import type { Pegawai } from "@/lib/types"
 import { calculateWorkDuration } from "@/lib/utils"
+import { useState } from "react"
 
 interface PropsModalLihatPegawai {
   pegawai: Pegawai | null
@@ -35,6 +35,8 @@ export function ModalLihatPegawai({
   tutup,
   hapusDokumen,
 }: PropsModalLihatPegawai) {
+  const [loadingFileId, setLoadingFileId] = useState<string | number | null>(null)
+
   if (!pegawai) return null
 
   const formatDate = (date?: string) => {
@@ -66,6 +68,53 @@ export function ModalLihatPegawai({
       <h3 className="text-xs font-bold uppercase tracking-widest text-foreground">{title}</h3>
     </div>
   )
+
+  const previewDocument = async (file: any) => {
+    try {
+      setLoadingFileId(file.idFile)
+      const res = await fetch(`/api/documents/${file.idFile}/stream`)
+      if (!res.ok) {
+        const msg = await res.text()
+        // coba fallback ke URL langsung jika ada
+        if (file.filePath) {
+          window.open(file.filePath, '_blank', 'noopener,noreferrer')
+          return
+        }
+        throw new Error(`Status ${res.status}: ${msg || 'Gagal memuat dokumen'}`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      console.error(err)
+      alert(`Tidak bisa menampilkan dokumen. ${String((err as Error).message || '')}`.trim())
+    } finally {
+      setLoadingFileId(null)
+    }
+  }
+
+  const downloadDocument = async (file: any) => {
+    try {
+      setLoadingFileId(file.idFile)
+      const res = await fetch(`/api/documents/${file.idFile}/download`)
+      if (!res.ok) {
+        const msg = await res.text()
+        throw new Error(`Status ${res.status}: ${msg || 'Gagal mengunduh dokumen'}`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.namaFile || 'dokumen'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert(`Tidak bisa mengunduh dokumen. ${String((err as Error).message || '')}`.trim())
+    } finally {
+      setLoadingFileId(null)
+    }
+  }
 
   return (
     <Dialog open={terbuka} onOpenChange={tutup}>
@@ -129,16 +178,16 @@ export function ModalLihatPegawai({
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               
               {/* IDENTITAS RESMI */}
-              {(pegawai.identitasResmi?.nik || pegawai.identitasResmi?.noBpjs || pegawai.identitasResmi?.noNpwp) && (
+              {(pegawai.identitasResmi || pegawai.nipPegawai) && (
                 <div>
                   <SectionTitle title="Identitas Resmi" icon={IdCard} />
                   <div className="space-y-0">
                     <DataRow label="NIK" value={pegawai.identitasResmi?.nik} />
-                    <DataRow label="NO. BPJS" value={pegawai.identitasResmi?.noBpjs} />
-                    <DataRow label="NO. NPWP" value={pegawai.identitasResmi?.noNpwp} />
-                    {pegawai.identitasResmi?.karpeg && <DataRow label="KARPEG" value={pegawai.identitasResmi.karpeg} />}
-                    {pegawai.identitasResmi?.karsuKarsi && <DataRow label="KARSU/KARSI" value={pegawai.identitasResmi.karsuKarsi} />}
-                    {pegawai.identitasResmi?.taspen && <DataRow label="TASPEN" value={pegawai.identitasResmi.taspen} />}
+                    <DataRow label="No. BPJS" value={pegawai.identitasResmi?.noBpjs} />
+                    <DataRow label="No. NPWP" value={pegawai.identitasResmi?.noNpwp} />
+                    <DataRow label="Karpeg" value={pegawai.identitasResmi?.karpeg} />
+                    <DataRow label="Karsu/Karsi" value={pegawai.identitasResmi?.karsuKarsi} />
+                    <DataRow label="Taspen" value={pegawai.identitasResmi?.taspen} />
                   </div>
                 </div>
               )}
@@ -233,18 +282,29 @@ export function ModalLihatPegawai({
                             <Badge variant="secondary" className="text-[9px]">{file.jenisDokumen || "DOKUMEN"}</Badge>
                             <span>{formatDate(file.waktuUpload)}</span>
                           </div>
+                          {file.filePath && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-0 h-auto text-xs"
+                                disabled={loadingFileId === file.idFile}
+                                onClick={() => previewDocument(file)}
+                              >
+                                {loadingFileId === file.idFile ? 'Memuat...' : 'Lihat'}
+                              </Button>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-0 h-auto text-xs"
+                                disabled={loadingFileId === file.idFile}
+                                onClick={() => downloadDocument(file)}
+                              >
+                                {loadingFileId === file.idFile ? 'Memuat...' : 'Download'}
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        {hapusDokumen && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => hapusDokumen(pegawai.nipPegawai, String(file.idFile))}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
                       </div>
                     ))}
                   </div>

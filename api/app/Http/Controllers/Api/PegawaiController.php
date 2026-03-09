@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\EfilePegawai;
 use App\Models\Kepegawaian;
+use App\Models\IdentitasResmi;
+use App\Models\Pangkat;
 use App\Models\Pegawai;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
@@ -76,10 +81,18 @@ class PegawaiController extends Controller
             ->filter()
             ->values();
 
+        $pangkatOptions = Pangkat::query()
+            ->selectRaw("CONCAT(\"pangkat\", ' (', \"golongan\", '/', \"ruang\", ')') as value")
+            ->orderBy('urutan')
+            ->pluck('value')
+            ->filter()
+            ->values();
+
         $payload = $result->toArray();
         $payload['filter_options'] = [
             'departemen' => $departemenOptions,
             'status' => $statusOptions,
+            'pangkat' => $pangkatOptions,
         ];
 
         return response()->json($payload);
@@ -92,9 +105,111 @@ class PegawaiController extends Controller
         return response()->json($this->normalizePegawai($pegawai));
     }
 
+    public function store(Request $request)
+    {
+        $pegawaiTable = (new Pegawai())->getTable();
+        $identitasTable = (new IdentitasResmi())->getTable();
+
+        $validated = $request->validate([
+            'nipPegawai' => ['required', 'string', 'max:25', Rule::unique($pegawaiTable, 'nipPegawai')],
+            'nama' => ['required', 'string', 'max:150'],
+            'gelarDepan' => ['nullable', 'string', 'max:50'],
+            'gelarBelakang' => ['nullable', 'string', 'max:50'],
+            'tempatLahir' => ['required', 'string', 'max:100'],
+            'tanggalLahir' => ['required', 'date'],
+            'jenisKelamin' => ['required', 'string', 'max:20'],
+            'agama' => ['required', 'string', 'max:20'],
+            'alamat' => ['nullable', 'string'],
+            'email' => ['required', 'email', 'max:120', Rule::unique($pegawaiTable, 'email')],
+            'noHp' => ['required', 'string', 'max:20'],
+            'jabatan' => ['required', 'string', 'max:150'],
+            'golongan' => ['required', 'string', 'max:100'],
+            'status' => ['required', 'string', 'max:30'],
+            'departemen' => ['required', 'string', 'max:150'],
+            'tanggalMasuk' => ['required', 'date'],
+            'foto' => ['nullable', 'file', 'image', 'max:5120'],
+
+            // Identitas resmi
+            'nik' => ['required', 'string', 'max:30', Rule::unique($identitasTable, 'nik')],
+            'noBpjs' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noBpjs')],
+            'noNpwp' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noNpwp')],
+            'karpeg' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karpeg')],
+            'karsuKarsi' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karsuKarsi')],
+            'taspen' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'taspen')],
+
+            // Kepegawaian
+            'statusPegawai' => ['required', 'string', 'max:50'],
+            'jenisPegawai' => ['required', 'string', 'max:100'],
+            'tmtCpns' => ['required', 'date'],
+            'tmtPns' => ['nullable', 'date'],
+            'masaKerjaTahun' => ['required', 'integer', 'min:0'],
+            'masaKerjaBulan' => ['required', 'integer', 'min:0', 'max:11'],
+        ]);
+
+        $fotoPath = null;
+        if ($request->hasFile('foto')) {
+            $stored = $request->file('foto')->storeAs(
+                'pegawai/photos',
+                $validated['nipPegawai'].'-'.now()->format('YmdHis').'-'.Str::random(6).'.'.$request->file('foto')->getClientOriginalExtension(),
+                'public'
+            );
+            $fotoPath = '/storage/'.$stored;
+        }
+
+        DB::transaction(function () use ($validated, $fotoPath) {
+            Pegawai::create([
+                'nipPegawai' => $validated['nipPegawai'],
+                'nama' => $validated['nama'],
+                'gelarDepan' => $validated['gelarDepan'] ?? null,
+                'gelarBelakang' => $validated['gelarBelakang'] ?? null,
+                'tempatLahir' => $validated['tempatLahir'],
+                'tanggalLahir' => $validated['tanggalLahir'],
+                'jenisKelamin' => $validated['jenisKelamin'],
+                'agama' => $validated['agama'],
+                'alamat' => $validated['alamat'] ?? null,
+                'email' => $validated['email'],
+                'noHp' => $validated['noHp'],
+                'foto' => $fotoPath ?? '',
+                'jabatan' => $validated['jabatan'],
+                'golongan' => $validated['golongan'],
+                'status' => $validated['status'],
+                'departemen' => $validated['departemen'],
+                'tanggalMasuk' => $validated['tanggalMasuk'],
+            ]);
+
+            IdentitasResmi::create([
+                'nipIdResmi' => $validated['nipPegawai'],
+                'nik' => $validated['nik'],
+                'noBpjs' => $validated['noBpjs'] ?? null,
+                'noNpwp' => $validated['noNpwp'] ?? null,
+                'karpeg' => $validated['karpeg'] ?? null,
+                'karsuKarsi' => $validated['karsuKarsi'] ?? null,
+                'taspen' => $validated['taspen'] ?? null,
+            ]);
+
+            Kepegawaian::create([
+                'nipKepegawaian' => $validated['nipPegawai'],
+                'statusPegawai' => $validated['statusPegawai'],
+                'jenisPegawai' => $validated['jenisPegawai'],
+                'tmtCpns' => $validated['tmtCpns'],
+                'tmtPns' => $validated['tmtPns'] ?? null,
+                'masaKerjaTahun' => $validated['masaKerjaTahun'],
+                'masaKerjaBulan' => $validated['masaKerjaBulan'],
+            ]);
+        });
+
+        $pegawai = Pegawai::with(['identitasResmi', 'kepegawaian', 'riwayatPangkat.pangkat', 'efiles'])
+            ->findOrFail($validated['nipPegawai']);
+
+        return response()->json($this->normalizePegawai($pegawai), 201);
+    }
+
     public function update(Request $request, string $id)
     {
         $pegawai = Pegawai::with(['identitasResmi', 'kepegawaian', 'riwayatPangkat.pangkat', 'efiles'])->findOrFail($id);
+
+        $pegawaiTable = (new Pegawai())->getTable();
+        $identitasTable = (new IdentitasResmi())->getTable();
 
         $validated = $request->validate([
             'nama' => ['nullable', 'string', 'max:150'],
@@ -113,6 +228,22 @@ class PegawaiController extends Controller
             'departemen' => ['nullable', 'string', 'max:150'],
             'tanggalMasuk' => ['nullable', 'date'],
             'foto' => ['nullable', 'file', 'image', 'max:5120'],
+
+            // Identitas resmi
+            'nik' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'nik')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'noBpjs' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noBpjs')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'noNpwp' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noNpwp')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'karpeg' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karpeg')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'karsuKarsi' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karsuKarsi')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'taspen' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'taspen')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+
+            // Kepegawaian
+            'statusPegawai' => ['nullable', 'string', 'max:50'],
+            'jenisPegawai' => ['nullable', 'string', 'max:100'],
+            'tmtCpns' => ['nullable', 'date'],
+            'tmtPns' => ['nullable', 'date'],
+            'masaKerjaTahun' => ['nullable', 'integer', 'min:0'],
+            'masaKerjaBulan' => ['nullable', 'integer', 'min:0', 'max:11'],
         ]);
 
         if ($request->hasFile('foto')) {
@@ -128,19 +259,39 @@ class PegawaiController extends Controller
         $pegawai->fill($validated);
         $pegawai->save();
 
-        if ($request->filled('departemen') || $request->filled('status')) {
+        // Update identitas resmi (if any field provided)
+        if ($request->hasAny(['nik', 'noBpjs', 'noNpwp', 'karpeg', 'karsuKarsi', 'taspen'])) {
+            $identitasPayload = [
+                'nik' => $request->input('nik', $pegawai->identitasResmi?->nik),
+                'noBpjs' => $request->input('noBpjs', $pegawai->identitasResmi?->noBpjs),
+                'noNpwp' => $request->input('noNpwp', $pegawai->identitasResmi?->noNpwp),
+                'karpeg' => $request->input('karpeg', $pegawai->identitasResmi?->karpeg),
+                'karsuKarsi' => $request->input('karsuKarsi', $pegawai->identitasResmi?->karsuKarsi),
+                'taspen' => $request->input('taspen', $pegawai->identitasResmi?->taspen),
+            ];
+
+            IdentitasResmi::updateOrCreate(
+                ['nipIdResmi' => $id],
+                $identitasPayload + ['nipIdResmi' => $id]
+            );
+        }
+
+        // Update kepegawaian (if any kepegawaian-related field provided)
+        if ($request->hasAny(['statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'masaKerjaTahun', 'masaKerjaBulan', 'departemen'])) {
             $existing = Kepegawaian::where('nipKepegawaian', $id)->first();
+
+            $kepegawaianPayload = [
+                'statusPegawai' => $request->input('statusPegawai', $existing?->statusPegawai),
+                'jenisPegawai' => $request->input('jenisPegawai', $existing?->jenisPegawai ?? $request->input('departemen')),
+                'tmtCpns' => $request->input('tmtCpns', $existing?->tmtCpns),
+                'tmtPns' => $request->input('tmtPns', $existing?->tmtPns),
+                'masaKerjaTahun' => $request->input('masaKerjaTahun', $existing?->masaKerjaTahun ?? 0),
+                'masaKerjaBulan' => $request->input('masaKerjaBulan', $existing?->masaKerjaBulan ?? 0),
+            ];
 
             Kepegawaian::updateOrCreate(
                 ['nipKepegawaian' => $id],
-                [
-                    'statusPegawai' => $request->input('status', $existing?->statusPegawai ?? 'PNS'),
-                    'jenisPegawai' => $request->input('departemen', $existing?->jenisPegawai ?? '-'),
-                    'tmtCpns' => $existing?->tmtCpns,
-                    'tmtPns' => $existing?->tmtPns,
-                    'masaKerjaTahun' => $existing?->masaKerjaTahun ?? 0,
-                    'masaKerjaBulan' => $existing?->masaKerjaBulan ?? 0,
-                ]
+                $kepegawaianPayload + ['nipKepegawaian' => $id]
             );
         }
 
@@ -216,6 +367,98 @@ class PegawaiController extends Controller
         $efile->delete();
 
         return response()->json(['message' => 'Dokumen dihapus']);
+    }
+
+    private function resolvePublicPath(?string $filePath): ?string
+    {
+        if (empty($filePath)) {
+            return null;
+        }
+
+        // Jika sudah URL penuh, coba ambil bagian setelah /storage/
+        if (Str::startsWith($filePath, ['http://', 'https://'])) {
+            $pos = strpos($filePath, '/storage/');
+            if ($pos !== false) {
+                $filePath = substr($filePath, $pos);
+            } else {
+                // URL eksternal, biarkan caller menangani
+                return $filePath;
+            }
+        }
+
+        if (Str::startsWith($filePath, '/storage/')) {
+            return ltrim(substr($filePath, 9), '/'); // remove "/storage/"
+        }
+
+        if (Str::startsWith($filePath, 'storage/')) {
+            return ltrim(substr($filePath, 8), '/'); // remove "storage/"
+        }
+
+        return ltrim($filePath, '/');
+    }
+
+    public function streamDocument(string $id): StreamedResponse|\Illuminate\Http\RedirectResponse
+    {
+        $efile = EfilePegawai::query()->findOrFail((int) $id);
+
+        $relative = $this->resolvePublicPath($efile->filePath);
+
+        // Jika filePath adalah URL eksternal (bukan menuju storage), redirect
+        if (Str::startsWith($relative, ['http://', 'https://'])) {
+            return redirect()->away($relative);
+        }
+
+        if (!$relative || !Storage::disk('public')->exists($relative)) {
+            abort(404, 'File tidak ditemukan');
+        }
+
+        $mime = Storage::disk('public')->mimeType($relative) ?: 'application/octet-stream';
+        $path = Storage::disk('public')->path($relative);
+
+        return response()->file($path, ['Content-Type' => $mime]);
+    }
+
+    public function downloadDocument(string $id)
+    {
+        $efile = EfilePegawai::query()->findOrFail((int) $id);
+
+        $relative = $this->resolvePublicPath($efile->filePath);
+
+        if (Str::startsWith($relative, ['http://', 'https://'])) {
+            return redirect()->away($relative);
+        }
+
+        if (!$relative || !Storage::disk('public')->exists($relative)) {
+            abort(404, 'File tidak ditemukan');
+        }
+
+        $path = Storage::disk('public')->path($relative);
+        $downloadName = $efile->namaFile ?: basename($path);
+
+        return response()->download($path, $downloadName);
+    }
+
+    public function destroy(string $id)
+    {
+        $pegawai = Pegawai::with(['efiles', 'identitasResmi', 'kepegawaian', 'riwayatPangkat'])->findOrFail($id);
+
+        DB::transaction(function () use ($pegawai) {
+            // Hapus file e-pegawai di storage
+            foreach ($pegawai->efiles as $efile) {
+                if (!empty($efile->filePath) && str_starts_with($efile->filePath, '/storage/')) {
+                    $relative = ltrim(str_replace('/storage/', '', $efile->filePath), '/');
+                    Storage::disk('public')->delete($relative);
+                }
+            }
+
+            $pegawai->efiles()->delete();
+            $pegawai->riwayatPangkat()->delete();
+            $pegawai->kepegawaian()->delete();
+            $pegawai->identitasResmi()->delete();
+            $pegawai->delete();
+        });
+
+        return response()->json(['message' => 'Pegawai dihapus']);
     }
 
     private function normalizePegawai(Pegawai $pegawai): array
