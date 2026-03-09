@@ -1,61 +1,162 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setAuth, isAuthenticated } from "@/lib/auth";
+
+type TurnstileRenderOptions = {
+  sitekey: string;
+  callback?: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+  theme?: "light" | "dark" | "auto";
+};
+
+type TurnstileInstance = {
+  render: (
+    elementOrId: HTMLElement | string,
+    options: TurnstileRenderOptions
+  ) => string;
+  reset: (widgetId?: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileInstance;
+  }
+}
+
+const TURNSTILE_SCRIPT_ID = "cf-turnstile-script";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [challengeId, setChallengeId] = useState("");
-  const [challengeQuestion, setChallengeQuestion] = useState("");
-  const [challengeAnswer, setChallengeAnswer] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingChallenge, setLoadingChallenge] = useState(false);
-
-  const loadChallenge = async () => {
-    setLoadingChallenge(true);
-    try {
-      const response = await fetch("/api/auth/challenge", {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error("Gagal memuat captcha");
-      }
-
-      const json = await response.json();
-      setChallengeId(json.challenge_id || "");
-      setChallengeQuestion(json.question || "");
-      setChallengeAnswer("");
-    } catch {
-      setChallengeId("");
-      setChallengeQuestion("");
-      setError("Gagal memuat captcha. Muat ulang halaman.");
-    } finally {
-      setLoadingChallenge(false);
-    }
-  };
+  const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState("");
+  const widgetRef = useRef<HTMLDivElement | null>(null);
+  const widgetIdRef = useRef<string | undefined>();
+  const turnstileSiteKey = import.meta.env
+    .VITE_TURNSTILE_SITE_KEY as string | undefined;
 
   useEffect(() => {
     if (isAuthenticated()) {
       navigate("/");
     }
-    loadChallenge();
   }, [navigate]);
+
+  useEffect(() => {
+    if (!turnstileSiteKey) {
+      setTurnstileError(
+        "Kunci Turnstile belum dikonfigurasi (VITE_TURNSTILE_SITE_KEY)."
+      );
+      return;
+    }
+
+    if (window.turnstile) {
+      setTurnstileReady(true);
+      return;
+    }
+
+    let script = document.getElementById(
+      TURNSTILE_SCRIPT_ID
+    ) as HTMLScriptElement | null;
+
+    const handleLoad = () => setTurnstileReady(true);
+    const handleError = () =>
+      setTurnstileError(
+        "Gagal memuat skrip Cloudflare Turnstile. Periksa koneksi Anda."
+      );
+
+    if (script) {
+      script.addEventListener("load", handleLoad);
+      script.addEventListener("error", handleError);
+      return () => {
+        script?.removeEventListener("load", handleLoad);
+        script?.removeEventListener("error", handleError);
+      };
+    }
+
+    script = document.createElement("script");
+    script.id = TURNSTILE_SCRIPT_ID;
+    script.src =
+      "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
+    document.head.appendChild(script);
+
+    return () => {
+      script?.removeEventListener("load", handleLoad);
+      script?.removeEventListener("error", handleError);
+    };
+  }, [turnstileSiteKey]);
+
+  useEffect(() => {
+    if (
+      !turnstileReady ||
+      !widgetRef.current ||
+      !window.turnstile ||
+      !turnstileSiteKey
+    ) {
+      return;
+    }
+
+    if (widgetIdRef.current) {
+      window.turnstile.reset(widgetIdRef.current);
+      return;
+    }
+
+    widgetIdRef.current = window.turnstile.render(widgetRef.current, {
+      sitekey: turnstileSiteKey,
+      theme: "dark",
+      callback: (token: string) => {
+        setTurnstileToken(token);
+        setTurnstileError("");
+      },
+      "error-callback": () => {
+        setTurnstileToken("");
+        setTurnstileError("Verifikasi captcha gagal. Silakan coba lagi.");
+      },
+      "expired-callback": () => {
+        setTurnstileToken("");
+        setTurnstileError("Captcha kedaluwarsa. Silakan verifikasi ulang.");
+      },
+    });
+  }, [turnstileReady, turnstileSiteKey]);
+
+  const resetTurnstile = () => {
+    if (widgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+    setTurnstileToken("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+
+    if (!turnstileSiteKey) {
+      setError(
+        "Captcha belum dikonfigurasi. Set VITE_TURNSTILE_SITE_KEY di frontend."
+      );
+      return;
+    }
+
+    if (!turnstileToken) {
+      setError("Silakan selesaikan captcha terlebih dahulu.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const body = new URLSearchParams({
         username,
         password,
-        challenge_id: challengeId,
-        challenge_answer: challengeAnswer,
+        turnstile_token: turnstileToken,
       });
 
       // Use relative path so Vite dev proxy handles CORS correctly
@@ -69,22 +170,29 @@ export default function LoginPage() {
       });
 
       if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(
-          `Login gagal (${response.status}) ${detail || ""}`.trim()
-        );
+        let detail = "";
+        try {
+          const json = await response.json();
+          detail = json?.message ?? "";
+        } catch {
+          detail = await response.text();
+        }
+
+        throw new Error(detail || `Login gagal (${response.status}).`);
       }
 
       const json = await response.json();
       setAuth({ token: json.token, user: json.user });
       navigate("/");
     } catch (err: any) {
-      setError(
+      const message =
         err?.message?.includes("Username atau password salah")
           ? "Username atau password salah."
-          : "Login gagal. Pastikan server API aktif dan kredensial benar."
-      );
-      await loadChallenge();
+          : err?.message ||
+            "Login gagal. Pastikan server API aktif dan kredensial benar.";
+
+      setError(message);
+      resetTurnstile();
     } finally {
       setLoading(false);
     }
@@ -157,32 +265,35 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label
-                  htmlFor="captcha"
-                  className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white"
-                >
-                  Verifikasi Human
+                <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
+                  Verifikasi Cloudflare
                 </label>
-                <div className="mb-2 rounded-md border border-white/20 bg-black/60 px-3 py-2 text-sm text-white">
-                  {loadingChallenge
-                    ? "Memuat captcha..."
-                    : challengeQuestion || "Captcha tidak tersedia"}
+                <div className="rounded-md border border-white/20 bg-black/60 px-3 py-2">
+                  <div
+                    ref={widgetRef}
+                    className="cf-turnstile min-h-[65px]"
+                    data-sitekey={turnstileSiteKey}
+                  >
+                    {!turnstileReady && !turnstileError
+                      ? "Memuat captcha..."
+                      : null}
+                  </div>
                 </div>
-                <input
-                  type="number"
-                  id="captcha"
-                  value={challengeAnswer}
-                  onChange={(e) => setChallengeAnswer(e.target.value)}
-                  placeholder="Masukkan hasil perkalian"
-                  className="w-full rounded-md border border-white/20 bg-black/60 px-3 py-2 text-sm text-white placeholder-white/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  required
-                  disabled={loadingChallenge || !challengeId}
-                />
+                {turnstileError && (
+                  <p className="mt-2 text-[11px] text-red-200">{turnstileError}</p>
+                )}
+                {!turnstileSiteKey && (
+                  <p className="mt-2 text-[11px] text-amber-200">
+                    Tambahkan VITE_TURNSTILE_SITE_KEY di file .env frontend.
+                  </p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading || loadingChallenge || !challengeId}
+                disabled={
+                  loading || !turnstileToken || !!turnstileError || !turnstileSiteKey
+                }
                 className="w-full rounded-md bg-primary py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-opacity"
               >
                 {loading ? "Memproses..." : "Login"}
