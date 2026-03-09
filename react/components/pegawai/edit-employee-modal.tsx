@@ -20,13 +20,33 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import type { Pegawai } from "@/lib/types"
+import type { IdentitasResmi, Kepegawaian, Pegawai } from "@/lib/types"
 import { departemenList, statusList, golonganList } from "@/lib/mock-data"
 
 const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"]
 const jenisKelaminList = ["Laki-laki", "Perempuan"]
 const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
 const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
+
+const ensureIdentitasResmi = (pegawai: Pegawai, current?: Partial<IdentitasResmi>): IdentitasResmi => ({
+  nipIdResmi: current?.nipIdResmi ?? pegawai.identitasResmi?.nipIdResmi ?? pegawai.nipPegawai,
+  nik: current?.nik ?? "",
+  noBpjs: current?.noBpjs ?? "",
+  noNpwp: current?.noNpwp ?? "",
+  karpeg: current?.karpeg ?? "",
+  karsuKarsi: current?.karsuKarsi ?? "",
+  taspen: current?.taspen ?? "",
+})
+
+const ensureKepegawaian = (pegawai: Pegawai, current?: Partial<Kepegawaian>): Kepegawaian => ({
+  nipKepegawaian: current?.nipKepegawaian ?? pegawai.kepegawaian?.nipKepegawaian ?? pegawai.nipPegawai,
+  statusPegawai: current?.statusPegawai ?? pegawai.kepegawaian?.statusPegawai ?? pegawai.status ?? "",
+  jenisPegawai: current?.jenisPegawai ?? pegawai.kepegawaian?.jenisPegawai ?? pegawai.departemen ?? "",
+  tmtCpns: current?.tmtCpns ?? pegawai.kepegawaian?.tmtCpns ?? pegawai.tanggalMasuk ?? "",
+  tmtPns: current?.tmtPns ?? pegawai.kepegawaian?.tmtPns ?? "",
+  masaKerjaTahun: current?.masaKerjaTahun ?? pegawai.kepegawaian?.masaKerjaTahun ?? 0,
+  masaKerjaBulan: current?.masaKerjaBulan ?? pegawai.kepegawaian?.masaKerjaBulan ?? 0,
+})
 
 interface EditEmployeeModalProps {
   pegawai: Pegawai | null
@@ -53,23 +73,8 @@ export function EditEmployeeModal({
         ...pegawai,
         status: pegawai.status ?? pegawai.kepegawaian?.statusPegawai ?? "",
         departemen: pegawai.departemen ?? pegawai.kepegawaian?.jenisPegawai ?? "",
-        identitasResmi: {
-          nipIdResmi: pegawai.identitasResmi?.nipIdResmi ?? pegawai.nipPegawai,
-          nik: pegawai.identitasResmi?.nik ?? "",
-          noBpjs: pegawai.identitasResmi?.noBpjs ?? "",
-          noNpwp: pegawai.identitasResmi?.noNpwp ?? "",
-          karpeg: pegawai.identitasResmi?.karpeg ?? "",
-          karsuKarsi: pegawai.identitasResmi?.karsuKarsi ?? "",
-          taspen: pegawai.identitasResmi?.taspen ?? "",
-        },
-        kepegawaian: {
-          statusPegawai: pegawai.kepegawaian?.statusPegawai ?? pegawai.status ?? "",
-          jenisPegawai: pegawai.kepegawaian?.jenisPegawai ?? pegawai.departemen ?? "",
-          tmtCpns: pegawai.kepegawaian?.tmtCpns ?? pegawai.tanggalMasuk ?? "",
-          tmtPns: pegawai.kepegawaian?.tmtPns ?? "",
-          masaKerjaTahun: pegawai.kepegawaian?.masaKerjaTahun ?? 0,
-          masaKerjaBulan: pegawai.kepegawaian?.masaKerjaBulan ?? 0,
-        },
+        identitasResmi: ensureIdentitasResmi(pegawai, pegawai.identitasResmi),
+        kepegawaian: ensureKepegawaian(pegawai, pegawai.kepegawaian),
       })
       setFotoFile(null)
     }
@@ -148,12 +153,12 @@ export function EditEmployeeModal({
     }
 
     const mergedIdentitas = {
-      ...pegawai.identitasResmi,
+      ...ensureIdentitasResmi(pegawai, pegawai.identitasResmi),
       ...formData.identitasResmi,
     }
 
     const mergedKepegawaian = {
-      ...pegawai.kepegawaian,
+      ...ensureKepegawaian(pegawai, pegawai.kepegawaian),
       ...formData.kepegawaian,
     }
 
@@ -483,7 +488,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    identitasResmi: { ...formData.identitasResmi, nik: e.target.value },
+                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, nik: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -499,7 +504,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    identitasResmi: { ...formData.identitasResmi, noBpjs: e.target.value },
+                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, noBpjs: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -515,7 +520,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    identitasResmi: { ...formData.identitasResmi, noNpwp: e.target.value },
+                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, noNpwp: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -531,7 +536,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    identitasResmi: { ...formData.identitasResmi, karpeg: e.target.value },
+                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, karpeg: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -547,7 +552,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    identitasResmi: { ...formData.identitasResmi, karsuKarsi: e.target.value },
+                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, karsuKarsi: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -563,7 +568,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    identitasResmi: { ...formData.identitasResmi, taspen: e.target.value },
+                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, taspen: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -583,7 +588,7 @@ export function EditEmployeeModal({
                 onValueChange={(value) =>
                   setFormData({
                     ...formData,
-                    kepegawaian: { ...formData.kepegawaian, statusPegawai: value },
+                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, statusPegawai: value }),
                   })
                 }
               >
@@ -608,7 +613,7 @@ export function EditEmployeeModal({
                 onValueChange={(value) =>
                   setFormData({
                     ...formData,
-                    kepegawaian: { ...formData.kepegawaian, jenisPegawai: value },
+                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, jenisPegawai: value }),
                   })
                 }
               >
@@ -635,7 +640,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    kepegawaian: { ...formData.kepegawaian, tmtCpns: e.target.value },
+                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, tmtCpns: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -652,7 +657,7 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    kepegawaian: { ...formData.kepegawaian, tmtPns: e.target.value },
+                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, tmtPns: e.target.value }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -670,7 +675,10 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    kepegawaian: { ...formData.kepegawaian, masaKerjaTahun: e.target.value as any },
+                    kepegawaian: ensureKepegawaian(pegawai, {
+                      ...formData.kepegawaian,
+                      masaKerjaTahun: e.target.value === "" ? 0 : Number(e.target.value),
+                    }),
                   })
                 }
                 className="bg-secondary text-sm"
@@ -688,7 +696,10 @@ export function EditEmployeeModal({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    kepegawaian: { ...formData.kepegawaian, masaKerjaBulan: e.target.value as any },
+                    kepegawaian: ensureKepegawaian(pegawai, {
+                      ...formData.kepegawaian,
+                      masaKerjaBulan: e.target.value === "" ? 0 : Number(e.target.value),
+                    }),
                   })
                 }
                 className="bg-secondary text-sm"

@@ -36,9 +36,12 @@ export default function LoginPage() {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileError, setTurnstileError] = useState("");
   const widgetRef = useRef<HTMLDivElement | null>(null);
-  const widgetIdRef = useRef<string | undefined>();
+  const widgetIdRef = useRef<string | undefined>(undefined);
   const turnstileSiteKey = import.meta.env
     .VITE_TURNSTILE_SITE_KEY as string | undefined;
+  const disableTurnstile =
+    import.meta.env.DEV ||
+    String(import.meta.env.VITE_DISABLE_TURNSTILE ?? "false").toLowerCase() === "true";
 
   useEffect(() => {
     if (isAuthenticated()) {
@@ -47,6 +50,13 @@ export default function LoginPage() {
   }, [navigate]);
 
   useEffect(() => {
+    if (disableTurnstile) {
+      setTurnstileReady(true);
+      setTurnstileToken("dev-bypass-token");
+      setTurnstileError("");
+      return;
+    }
+
     if (!turnstileSiteKey) {
       setTurnstileError(
         "Kunci Turnstile belum dikonfigurasi (VITE_TURNSTILE_SITE_KEY)."
@@ -92,9 +102,13 @@ export default function LoginPage() {
       script?.removeEventListener("load", handleLoad);
       script?.removeEventListener("error", handleError);
     };
-  }, [turnstileSiteKey]);
+  }, [disableTurnstile, turnstileSiteKey]);
 
   useEffect(() => {
+    if (disableTurnstile) {
+      return;
+    }
+
     if (
       !turnstileReady ||
       !widgetRef.current ||
@@ -125,7 +139,7 @@ export default function LoginPage() {
         setTurnstileError("Captcha kedaluwarsa. Silakan verifikasi ulang.");
       },
     });
-  }, [turnstileReady, turnstileSiteKey]);
+  }, [disableTurnstile, turnstileReady, turnstileSiteKey]);
 
   const resetTurnstile = () => {
     if (widgetIdRef.current && window.turnstile) {
@@ -138,14 +152,14 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    if (!turnstileSiteKey) {
+    if (!disableTurnstile && !turnstileSiteKey) {
       setError(
         "Captcha belum dikonfigurasi. Set VITE_TURNSTILE_SITE_KEY di frontend."
       );
       return;
     }
 
-    if (!turnstileToken) {
+    if (!disableTurnstile && !turnstileToken) {
       setError("Silakan selesaikan captcha terlebih dahulu.");
       return;
     }
@@ -268,21 +282,27 @@ export default function LoginPage() {
                 <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
                   Verifikasi Cloudflare
                 </label>
-                <div>
-                  <div
-                    ref={widgetRef}
-                    className="cf-turnstile min-h-[65px]"
-                    data-sitekey={turnstileSiteKey}
-                  >
-                    {!turnstileReady && !turnstileError
-                      ? "Memuat captcha..."
-                      : null}
+                {disableTurnstile ? (
+                  <div className="rounded-md border border-amber-400/50 bg-amber-500/20 p-2 text-xs text-amber-100">
+                    Mode development aktif. Verifikasi captcha dilewati sementara.
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <div
+                      ref={widgetRef}
+                      className="cf-turnstile min-h-[65px]"
+                      data-sitekey={turnstileSiteKey}
+                    >
+                      {!turnstileReady && !turnstileError
+                        ? "Memuat captcha..."
+                        : null}
+                    </div>
+                  </div>
+                )}
                 {turnstileError && (
                   <p className="mt-2 text-[11px] text-red-200">{turnstileError}</p>
                 )}
-                {!turnstileSiteKey && (
+                {!disableTurnstile && !turnstileSiteKey && (
                   <p className="mt-2 text-[11px] text-amber-200">
                     Tambahkan VITE_TURNSTILE_SITE_KEY di file .env frontend.
                   </p>
@@ -292,7 +312,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={
-                  loading || !turnstileToken || !!turnstileError || !turnstileSiteKey
+                  loading || (!disableTurnstile && (!turnstileToken || !!turnstileError || !turnstileSiteKey))
                 }
                 className="w-full rounded-md bg-primary py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-opacity"
               >
