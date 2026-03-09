@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Briefcase, Medal, Eye, TrendingUp, AlertCircle } from "lucide-react"
+import { Briefcase, Medal, Eye, TrendingUp } from "lucide-react"
 import type { Pegawai } from "@/lib/types"
 import { golonganList } from "@/lib/mock-data"
 
@@ -24,42 +24,65 @@ const batasPangkatPendidikan: Record<string, string> = {
   "S3": "Pembina Utama (IV/e)",
 }
 
+const statusNonAktif = ["cuti", "pensiun", "nonaktif", "resign"]
+
+const normalisasiPendidikan = (pegawai: Pegawai): string => {
+  const pAny = pegawai as any
+  const raw = (pAny?.pendidikanTerakhir ?? pAny?.kepegawaian?.pendidikanTerakhir ?? "").toString().trim().toUpperCase()
+
+  if (["SMA", "SMK"].includes(raw)) return "SMA"
+  if (["D3", "DIPLOMA 3", "DIPLOMA III"].includes(raw)) return "D3"
+  if (["D4", "DIPLOMA 4", "DIPLOMA IV"].includes(raw)) return "D4"
+  if (["S1", "STRATA 1"].includes(raw)) return "S1"
+  if (["S2", "STRATA 2"].includes(raw)) return "S2"
+  if (["S3", "STRATA 3"].includes(raw)) return "S3"
+
+  return "S1"
+}
+
+const ambilTmtGolonganAktif = (pegawai: Pegawai): string | undefined => {
+  const pAny = pegawai as any
+  const riwayatTerbaru = [...(pegawai.riwayatPangkat ?? [])]
+    .sort((a, b) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
+
+  return (
+    riwayatTerbaru?.tmtPangkat
+    ?? pAny?.tmtGolongan
+    ?? pegawai.tanggalMasuk
+    ?? pegawai.kepegawaian?.tmtCpns
+    ?? pegawai.kepegawaian?.tmtPns
+  )
+}
+
+const hitungMasaKerja = (tanggalAwal?: string) => {
+  if (!tanggalAwal) return { tahun: 0, bulan: 0 }
+
+  const mulai = new Date(tanggalAwal)
+  if (Number.isNaN(mulai.getTime())) return { tahun: 0, bulan: 0 }
+
+  const sekarang = new Date()
+  let tahun = sekarang.getFullYear() - mulai.getFullYear()
+  let bulan = sekarang.getMonth() - mulai.getMonth()
+
+  if (bulan < 0 || (bulan === 0 && sekarang.getDate() < mulai.getDate())) {
+    tahun -= 1
+    bulan += 12
+  }
+
+  return { tahun, bulan }
+}
+
+const formatTanggalIndonesia = (date: Date) =>
+  date.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
+
 export function KelayakanKenaikanPangkat({ daftarPegawai, lihatDetail }: PropsKelayakanKenaikanPangkat) {
   const statusAktif = (status?: string) => {
     const nilai = (status ?? '').toString().trim().toLowerCase()
     if (!nilai) return true
 
-    return !['cuti', 'pensiun', 'nonaktif', 'resign'].includes(nilai)
+    return !statusNonAktif.includes(nilai)
   }
 
-  const hitungMasaKerja = (tanggalMasuk: string) => {
-    if (!tanggalMasuk) return { tahun: 0, bulan: 0 }
-
-    const mulai = new Date(tanggalMasuk)
-    if (Number.isNaN(mulai.getTime())) return { tahun: 0, bulan: 0 }
-
-    const sekarang = new Date()
-    
-    let tahun = sekarang.getFullYear() - mulai.getFullYear()
-    let bulan = sekarang.getMonth() - mulai.getMonth()
-    
-    if (bulan < 0 || (bulan === 0 && sekarang.getDate() < mulai.getDate())) {
-      tahun--
-      bulan += 12
-    }
-    
-    return { tahun, bulan }
-  }
-
-  const dapatkanGolonganBerikutnya = (golongan: string) => {
-    const index = golonganList.indexOf(golongan)
-    if (index !== -1 && index < golonganList.length - 1) {
-      return golonganList[index + 1]
-    }
-    return null
-  }
-
-  // Helper: Cek apakah golongan saat ini sudah mentok pendidikan
   const isMaxRankReached = (golonganSaatIni: string, pendidikan: string) => {
     if (!pendidikan || !batasPangkatPendidikan[pendidikan]) return false 
     
@@ -70,67 +93,51 @@ export function KelayakanKenaikanPangkat({ daftarPegawai, lihatDetail }: PropsKe
     return currentIndex >= maxIndex
   }
 
-  // Helper: Hitung estimasi kenaikan pangkat berikutnya
-  const getEstimasiNaikPangkat = (tmtGolongan: string): string => {
-    if (!tmtGolongan) return "TMT Golongan tidak valid";
-    
-    const tmtDate = new Date(tmtGolongan);
-    if (isNaN(tmtDate.getTime())) return "TMT Golongan tidak valid";
+  const getInfoKelayakanPangkat = (tmtGolongan?: string): { layak: boolean; keterangan: string } => {
+    if (!tmtGolongan) return { layak: false, keterangan: "TMT golongan belum tersedia" }
 
-    const targetDate = new Date(tmtGolongan);
-    targetDate.setFullYear(targetDate.getFullYear() + 4);
+    const mulai = new Date(tmtGolongan)
+    if (Number.isNaN(mulai.getTime())) return { layak: false, keterangan: "TMT golongan tidak valid" }
 
-    const targetYear = targetDate.getFullYear();
-    const targetMonth = targetDate.getMonth();
-    const targetDay = targetDate.getDate();
+    const target = new Date(mulai)
+    target.setFullYear(target.getFullYear() + 4)
 
-    let estimasiTahunFinal = targetYear;
-    let estimasiBulanFinal = "April";
+    const sekarang = new Date()
+    const layak = sekarang.getTime() >= target.getTime()
 
-    if (targetMonth > 9 || (targetMonth === 9 && targetDay > 1)) { // Setelah 1 Oktober
-        estimasiTahunFinal = targetYear + 1;
-        estimasiBulanFinal = "April";
-    } else if (targetMonth > 3 || (targetMonth === 3 && targetDay > 1)) { // Setelah 1 April
-        estimasiTahunFinal = targetYear;
-        estimasiBulanFinal = "Oktober";
+    if (layak) {
+      return { layak: true, keterangan: `Layak sejak ${formatTanggalIndonesia(target)}` }
     }
-    
-    return `Estimasi ${estimasiBulanFinal} ${estimasiTahunFinal}`;
-  };
+
+    return { layak: false, keterangan: `Memenuhi syarat pada ${formatTanggalIndonesia(target)}` }
+  }
 
   const pegawaiLayak = daftarPegawai
     .map((p) => {
-      const pAny = p as any
-      const tmtGolongan = pAny.tmtGolongan || p.tanggalMasuk; // Fallback ke tanggalMasuk
-      const { tahun, bulan } = hitungMasaKerja(tmtGolongan || '')
-      const pendidikan = pAny.pendidikanTerakhir || "S1" // Default S1 jika data kosong
-      const isMentok = isMaxRankReached(p.golongan || '', pendidikan);
-      const layakNaikPangkat = tahun >= 4 && !isMentok;
-
-      let saran = "";
-      if (isMentok) {
-        saran = "Telah mencapai batas maksimal pendidikan.";
-      } else if (layakNaikPangkat) {
-        saran = getEstimasiNaikPangkat(tmtGolongan);
-      }
+      const tmtGolonganAktif = ambilTmtGolonganAktif(p)
+      const { tahun, bulan } = hitungMasaKerja(tmtGolonganAktif)
+      const pendidikan = normalisasiPendidikan(p)
+      const isMentok = isMaxRankReached(p.golongan || '', pendidikan)
+      const infoKelayakan = getInfoKelayakanPangkat(tmtGolonganAktif)
+      const layakNaikPangkat = infoKelayakan.layak && !isMentok
 
       return {
         ...p,
+        tmtGolonganAktif,
         masaKerjaGolonganTahun: tahun,
         masaKerjaGolonganBulan: bulan,
         pendidikan,
-        isMentok,
         layakNaikPangkat,
-        saran,
+        keterangan: infoKelayakan.keterangan,
       }
     })
-    // Syarat: Aktif, dan (sudah mentok ATAU sudah layak naik pangkat)
-    .filter((p) => statusAktif(p.status) && (p.isMentok || p.layakNaikPangkat))
+    .filter((p) => statusAktif(p.status) && p.layakNaikPangkat)
     .sort((a, b) => {
-      // Prioritaskan yang layak, lalu yang mentok. Kemudian sort by masa kerja.
-      if (a.layakNaikPangkat && !b.layakNaikPangkat) return -1;
-      if (!a.layakNaikPangkat && b.layakNaikPangkat) return 1;
-      return b.masaKerjaGolonganTahun - a.masaKerjaGolonganTahun;
+      if (b.masaKerjaGolonganTahun !== a.masaKerjaGolonganTahun) {
+        return b.masaKerjaGolonganTahun - a.masaKerjaGolonganTahun
+      }
+
+      return b.masaKerjaGolonganBulan - a.masaKerjaGolonganBulan
     })
 
   return (
@@ -143,7 +150,7 @@ export function KelayakanKenaikanPangkat({ daftarPegawai, lihatDetail }: PropsKe
               Layak Naik Pangkat
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Masa kerja ≥ 4 tahun & memenuhi syarat pendidikan
+              Masa kerja golongan minimal 4 tahun dan syarat pendidikan terpenuhi
             </CardDescription>
           </div>
           <Badge variant="secondary" className="h-fit">
@@ -162,11 +169,7 @@ export function KelayakanKenaikanPangkat({ daftarPegawai, lihatDetail }: PropsKe
               pegawaiLayak.map((pegawai) => (
                 <div
                   key={pegawai.nipPegawai}
-                  className={`flex items-start justify-between gap-3 rounded-lg border p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-md ${
-                    pegawai.layakNaikPangkat
-                      ? "border-green-500/30 bg-green-500/5 hover:bg-green-500/10"
-                      : "border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10"
-                  }`}
+                  className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-md border-green-500/30 bg-green-500/5 hover:bg-green-500/10"
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 border">
@@ -182,24 +185,17 @@ export function KelayakanKenaikanPangkat({ daftarPegawai, lihatDetail }: PropsKe
                           <Briefcase className="h-3 w-3" />
                           {pegawai.golongan?.split('(')[0]}
                         </p>
-                        {pegawai.isMentok ? (
-                          <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1 font-medium">
-                            <AlertCircle className="h-3 w-3" />
-                            {pegawai.saran}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-green-600 dark:text-green-500 flex items-center gap-1 font-medium">
-                            <TrendingUp className="h-3 w-3" />
-                            {pegawai.saran}
-                          </p>
-                        )}
+                        <p className="text-xs text-green-600 dark:text-green-500 flex items-center gap-1 font-medium">
+                          <TrendingUp className="h-3 w-3" />
+                          {pegawai.keterangan}
+                        </p>
                       </div>
                       <p className="text-xs text-muted-foreground">NIP: {pegawai.nipPegawai}</p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <span className="inline-flex items-center rounded-md bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground ring-1 ring-inset ring-border">
-                      Masa Kerja Gol: {pegawai.masaKerjaGolonganTahun} Thn
+                      Masa Kerja Gol: {pegawai.masaKerjaGolonganTahun} Thn {pegawai.masaKerjaGolonganBulan} Bln
                     </span>
                     <Button 
                       size="sm" 
@@ -226,47 +222,53 @@ export function SatyalancanaKaryaSatya({ daftarPegawai, lihatDetail }: PropsKela
     const nilai = (status ?? '').toString().trim().toLowerCase()
     if (!nilai) return true
 
-    return !['cuti', 'pensiun', 'nonaktif', 'resign'].includes(nilai)
+    return !statusNonAktif.includes(nilai)
   }
 
-  const hitungMasaKerja = (tanggalMasuk: string) => {
-    if (!tanggalMasuk) return { tahun: 0, bulan: 0 }
-
-    const mulai = new Date(tanggalMasuk)
-    if (Number.isNaN(mulai.getTime())) return { tahun: 0, bulan: 0 }
-
-    const sekarang = new Date()
-    
-    let tahun = sekarang.getFullYear() - mulai.getFullYear()
-    let bulan = sekarang.getMonth() - mulai.getMonth()
-    
-    if (bulan < 0 || (bulan === 0 && sekarang.getDate() < mulai.getDate())) {
-      tahun--
-      bulan += 12
-    }
-    
-    return { tahun, bulan }
-  }
+  const milestones = [10, 20, 30]
 
   const pegawaiSenior = daftarPegawai
     .map((p) => {
-      const { tahun, bulan } = hitungMasaKerja(p.tanggalMasuk || '')
-      
-      let kategori = null
-      if (tahun >= 30) kategori = "30 Thn (Emas)"
-      else if (tahun >= 20) kategori = "20 Thn (Perak)"
-      else if (tahun >= 10) kategori = "10 Thn (Perunggu)"
+      const tmtMasuk = p.tanggalMasuk ?? p.kepegawaian?.tmtCpns ?? p.kepegawaian?.tmtPns
+      const { tahun, bulan } = hitungMasaKerja(tmtMasuk)
+
+      const tercapai = milestones.filter((m) => tahun >= m).at(-1)
+      const berikutnya = milestones.find((m) => tahun < m)
+
+      let kategoriSatya = ""
+      let statusSatya: "Memenuhi" | "Mendekati" | "Belum" = "Belum"
+
+      if (tercapai) {
+        statusSatya = "Memenuhi"
+        kategoriSatya = `${tercapai} Tahun`
+      } else if (berikutnya) {
+        const sisaTahun = berikutnya - tahun
+        if (sisaTahun === 0 || (sisaTahun === 1 && bulan >= 0)) {
+          statusSatya = "Mendekati"
+          kategoriSatya = `Menuju ${berikutnya} Tahun`
+        }
+      }
 
       return {
         ...p,
         masaKerjaTahun: tahun,
         masaKerjaBulan: bulan,
-        kategoriSatya: kategori
+        kategoriSatya,
+        statusSatya,
       }
     })
-    // Syarat: Mencapai 10, 20, atau 30 tahun
-    .filter((p) => p.kategoriSatya !== null && statusAktif(p.status))
-    .sort((a, b) => b.masaKerjaTahun - a.masaKerjaTahun)
+    .filter((p) => statusAktif(p.status) && p.statusSatya !== "Belum")
+    .sort((a, b) => {
+      if (a.statusSatya !== b.statusSatya) {
+        return a.statusSatya === "Memenuhi" ? -1 : 1
+      }
+
+      if (b.masaKerjaTahun !== a.masaKerjaTahun) {
+        return b.masaKerjaTahun - a.masaKerjaTahun
+      }
+
+      return b.masaKerjaBulan - a.masaKerjaBulan
+    })
 
   return (
     <Card className="h-full min-h-[600px] flex flex-col border-border transition-all duration-300 hover:scale-[1.01] hover:shadow-lg">
@@ -278,7 +280,7 @@ export function SatyalancanaKaryaSatya({ daftarPegawai, lihatDetail }: PropsKela
               Satyalancana Karya Satya
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Penghargaan pengabdian 10, 20, dan 30 Tahun
+              Monitoring pegawai yang mendekati atau memenuhi masa kerja 10, 20, dan 30 tahun
             </CardDescription>
           </div>
           <Badge variant="secondary" className="h-fit bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
@@ -324,6 +326,13 @@ export function SatyalancanaKaryaSatya({ daftarPegawai, lihatDetail }: PropsKela
                         'bg-orange-50 text-orange-700 ring-orange-600/20'}
                     `}>
                       {pegawai.kategoriSatya}
+                    </span>
+                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium ring-1 ring-inset ${
+                      pegawai.statusSatya === 'Memenuhi'
+                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                        : 'bg-blue-50 text-blue-700 ring-blue-600/20'
+                    }`}>
+                      {pegawai.statusSatya}
                     </span>
                     <Button 
                       size="sm" 
