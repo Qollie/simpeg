@@ -12,7 +12,6 @@ Route::get('/', function () {
 });
 
 Route::prefix('api')->withoutMiddleware([ValidateCsrfToken::class])->group(function () {
-    Route::get('auth/challenge', [AuthController::class, 'challenge']);
     Route::post('auth/login', [AuthController::class, 'login']);
 
     // Akses dokumen tanpa perlu token (file sudah berada di storage publik)
