@@ -35,4 +35,9 @@ class Pegawai extends Model
     {
         return $this->hasMany(RiwayatPangkat::class, 'nipRiwayat', 'nipPegawai');
     }
+
+    public function riwayatPangkatTerbaru()
+    {
+        return $this->hasOne(RiwayatPangkat::class, 'nipRiwayat', 'nipPegawai')->latestOfMany('tmtPangkat');
+    }
 }

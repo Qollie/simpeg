@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CareerController;
 use App\Http\Controllers\Api\PegawaiController;
 
 Route::get('/', function () {
@@ -18,6 +19,8 @@ Route::prefix('api')->withoutMiddleware([ValidateCsrfToken::class])->group(funct
         Route::get('pegawai', [PegawaiController::class, 'index']);
         Route::post('pegawai', [PegawaiController::class, 'store']);
         Route::get('pegawai/{id}', [PegawaiController::class, 'show']);
+        Route::get('karir/naik-pangkat', [CareerController::class, 'promotionEligibility']);
+        Route::get('karir/satyalancana', [CareerController::class, 'satyalancana']);
         Route::post('pegawai/{id}', [PegawaiController::class, 'update']);
         Route::put('pegawai/{id}', [PegawaiController::class, 'update']);
         Route::delete('pegawai/{id}', [PegawaiController::class, 'destroy']);
