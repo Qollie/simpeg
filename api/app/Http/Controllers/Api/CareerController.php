@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -55,8 +56,10 @@ class CareerController extends Controller
             ->orderBy('nama')
             ->paginate($perPage);
 
+            $items = array_map(fn ($item) => $this->normalizeCareerItem($item), $paginated->items());
+
         return response()->json([
-            'data' => $paginated->items(),
+                'data' => $items,
             'current_page' => $paginated->currentPage(),
             'last_page' => $paginated->lastPage(),
             'per_page' => $paginated->perPage(),
@@ -82,8 +85,10 @@ class CareerController extends Controller
             ->orderBy('nama')
             ->paginate($perPage);
 
+            $items = array_map(fn ($item) => $this->normalizeCareerItem($item), $paginated->items());
+
         return response()->json([
-            'data' => $paginated->items(),
+                'data' => $items,
             'current_page' => $paginated->currentPage(),
             'last_page' => $paginated->lastPage(),
             'per_page' => $paginated->perPage(),
@@ -363,5 +368,25 @@ class CareerController extends Controller
         }
 
         return $index + 1;
+    }
+
+    private function normalizeCareerItem(object $item): array
+    {
+        $data = (array) $item;
+
+        if (!empty($data['foto'])) {
+            $data['foto'] = $this->normalizeFilePath($data['foto']);
+        }
+
+        return $data;
+    }
+
+    private function normalizeFilePath(string $path): string
+    {
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+
+        return url($path);
     }
 }
