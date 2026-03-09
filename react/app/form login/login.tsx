@@ -268,7 +268,7 @@ export default function LoginPage() {
                 <label className="mb-1.5 sm:mb-2 block text-xs sm:text-sm font-medium text-white">
                   Verifikasi Cloudflare
                 </label>
-                <div className="rounded-md border border-white/20 bg-black/60 px-3 py-2">
+                <div>
                   <div
                     ref={widgetRef}
                     className="cf-turnstile min-h-[65px]"
