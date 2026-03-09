@@ -18,6 +18,7 @@ export interface PaginationMeta {
 export interface PromotionEligibilityItem {
   nipPegawai: string
   nama: string
+  foto?: string
   jabatan?: string
   golongan?: string
   masaKerjaGolonganTahun: number
@@ -28,6 +29,7 @@ export interface PromotionEligibilityItem {
 export interface SatyalancanaItem {
   nipPegawai: string
   nama: string
+  foto?: string
   jabatan?: string
   golongan?: string
   masaKerjaTahun: number
@@ -96,6 +98,15 @@ function RenderPagination({ pagination, onPageChange }: { pagination: Pagination
   )
 }
 
+function getInitials(nama: string): string {
+  return nama
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((bagian) => bagian[0]?.toUpperCase() ?? "")
+    .join("") || "PG"
+}
+
 export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageChange, lihatDetail }: PropsKelayakanKenaikanPangkat) {
   return (
     <Card className="h-full min-h-[600px] flex flex-col border-border">
@@ -134,8 +145,8 @@ export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageCha
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 border">
-                      <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random`} />
-                      <AvatarFallback>PG</AvatarFallback>
+                      <AvatarImage src={pegawai.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random`} />
+                      <AvatarFallback>{getInitials(pegawai.nama)}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
                       <p className="text-sm font-medium leading-none">{pegawai.nama}</p>
@@ -206,8 +217,8 @@ export function SatyalancanaKaryaSatya({ items, pagination, loading, onPageChang
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 border">
-                      <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random`} />
-                      <AvatarFallback>PG</AvatarFallback>
+                      <AvatarImage src={pegawai.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random`} />
+                      <AvatarFallback>{getInitials(pegawai.nama)}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
                       <p className="text-sm font-medium leading-none">{pegawai.nama}</p>

@@ -50,7 +50,8 @@ class CareerController extends Controller
         $query = $this->promotionBaseQuery($request, $maxRankOrder);
 
         $paginated = $query
-            ->orderByDesc(DB::raw('(masaKerjaGolonganTahun * 12 + masaKerjaGolonganBulan)'))
+            ->orderByDesc('masaKerjaGolonganTahun')
+            ->orderByDesc('masaKerjaGolonganBulan')
             ->orderBy('nama')
             ->paginate($perPage);
 
@@ -76,8 +77,8 @@ class CareerController extends Controller
         }
 
         $paginated = $query
-            ->orderByRaw("CASE WHEN statusSatya = 'memenuhi' THEN 1 ELSE 0 END DESC")
-            ->orderByDesc(DB::raw('(masaKerjaTahun * 12 + masaKerjaBulan)'))
+            ->orderByRaw("CASE WHEN \"statusSatya\" = 'memenuhi' THEN 1 ELSE 0 END DESC")
+            ->orderByDesc(DB::raw('("masaKerjaTahun" * 12 + "masaKerjaBulan")'))
             ->orderBy('nama')
             ->paginate($perPage);
 
@@ -119,7 +120,8 @@ class CareerController extends Controller
         $maxRankOrder = $this->golonganOrder(self::BATAS_PANGKAT_PENDIDIKAN[$pendidikan] ?? 'Pembina (IV/a)');
 
         $rows = $this->promotionBaseQuery($request, $maxRankOrder)
-            ->orderByDesc(DB::raw('(masaKerjaGolonganTahun * 12 + masaKerjaGolonganBulan)'))
+            ->orderByDesc('masaKerjaGolonganTahun')
+            ->orderByDesc('masaKerjaGolonganBulan')
             ->orderBy('nama')
             ->get();
 
@@ -155,8 +157,8 @@ class CareerController extends Controller
         }
 
         $rows = $query
-            ->orderByRaw("CASE WHEN statusSatya = 'memenuhi' THEN 1 ELSE 0 END DESC")
-            ->orderByDesc(DB::raw('(masaKerjaTahun * 12 + masaKerjaBulan)'))
+            ->orderByRaw("CASE WHEN \"statusSatya\" = 'memenuhi' THEN 1 ELSE 0 END DESC")
+            ->orderByDesc(DB::raw('("masaKerjaTahun" * 12 + "masaKerjaBulan")'))
             ->orderBy('nama')
             ->get();
 
@@ -190,15 +192,16 @@ class CareerController extends Controller
             ->select([
                 'b.nipPegawai',
                 'b.nama',
+                'b.foto',
                 'b.jabatan',
                 'b.golongan',
                 'b.tmtGolonganAktif',
-                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.tmtGolonganAktif::date))::int as masaKerjaGolonganTahun"),
-                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.tmtGolonganAktif::date))::int as masaKerjaGolonganBulan"),
-                DB::raw("(b.tmtGolonganAktif::date + interval '4 years')::date as eligibleDate"),
+                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.\"tmtGolonganAktif\"::date))::int as \"masaKerjaGolonganTahun\""),
+                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.\"tmtGolonganAktif\"::date))::int as \"masaKerjaGolonganBulan\""),
+                DB::raw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date as \"eligibleDate\""),
             ])
             ->whereNotNull('b.tmtGolonganAktif')
-            ->whereRaw("(b.tmtGolonganAktif::date + interval '4 years')::date <= CURRENT_DATE")
+            ->whereRaw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date <= CURRENT_DATE")
             ->where(function ($sub) use ($maxRankOrder) {
                 $sub->where('b.rankOrder', 0)
                     ->orWhere('b.rankOrder', '<', $maxRankOrder);
@@ -223,18 +226,20 @@ class CareerController extends Controller
             ->select([
                 'b.nipPegawai',
                 'b.nama',
+                'b.foto',
                 'b.jabatan',
                 'b.golongan',
                 'b.tanggalMasuk',
-                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.tanggalMasuk::date))::int as masaKerjaTahun"),
-                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.tanggalMasuk::date))::int as masaKerjaBulan"),
+                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.\"tanggalMasuk\"::date))::int as \"masaKerjaTahun\""),
+                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.\"tanggalMasuk\"::date))::int as \"masaKerjaBulan\""),
             ])
             ->whereNotNull('b.tanggalMasuk');
 
-        $query = DB::query()->fromSub($withTenure, 't')
+        $withStatus = DB::query()->fromSub($withTenure, 't')
             ->select([
                 't.nipPegawai',
                 't.nama',
+                't.foto',
                 't.jabatan',
                 't.golongan',
                 't.tanggalMasuk',
@@ -242,44 +247,48 @@ class CareerController extends Controller
                 't.masaKerjaBulan',
                 DB::raw(
                     "CASE
-                        WHEN t.masaKerjaTahun >= 30 THEN 'memenuhi'
-                        WHEN t.masaKerjaTahun >= 20 THEN 'memenuhi'
-                        WHEN t.masaKerjaTahun >= 10 THEN 'memenuhi'
-                        WHEN t.masaKerjaTahun >= (30 - {$nearYears}) THEN 'mendekati'
-                        WHEN t.masaKerjaTahun >= (20 - {$nearYears}) THEN 'mendekati'
-                        WHEN t.masaKerjaTahun >= (10 - {$nearYears}) THEN 'mendekati'
+                        WHEN t.\"masaKerjaTahun\" >= 30 THEN 'memenuhi'
+                        WHEN t.\"masaKerjaTahun\" >= 20 THEN 'memenuhi'
+                        WHEN t.\"masaKerjaTahun\" >= 10 THEN 'memenuhi'
+                        WHEN t.\"masaKerjaTahun\" >= (30 - {$nearYears}) THEN 'mendekati'
+                        WHEN t.\"masaKerjaTahun\" >= (20 - {$nearYears}) THEN 'mendekati'
+                        WHEN t.\"masaKerjaTahun\" >= (10 - {$nearYears}) THEN 'mendekati'
                         ELSE 'belum'
-                    END as statusSatya"
+                    END as \"statusSatya\""
                 ),
                 DB::raw(
                     "CASE
-                        WHEN t.masaKerjaTahun >= 30 THEN '30 Tahun'
-                        WHEN t.masaKerjaTahun >= 20 THEN '20 Tahun'
-                        WHEN t.masaKerjaTahun >= 10 THEN '10 Tahun'
-                        WHEN t.masaKerjaTahun >= (30 - {$nearYears}) THEN 'Menuju 30 Tahun'
-                        WHEN t.masaKerjaTahun >= (20 - {$nearYears}) THEN 'Menuju 20 Tahun'
-                        WHEN t.masaKerjaTahun >= (10 - {$nearYears}) THEN 'Menuju 10 Tahun'
+                        WHEN t.\"masaKerjaTahun\" >= 30 THEN '30 Tahun'
+                        WHEN t.\"masaKerjaTahun\" >= 20 THEN '20 Tahun'
+                        WHEN t.\"masaKerjaTahun\" >= 10 THEN '10 Tahun'
+                        WHEN t.\"masaKerjaTahun\" >= (30 - {$nearYears}) THEN 'Menuju 30 Tahun'
+                        WHEN t.\"masaKerjaTahun\" >= (20 - {$nearYears}) THEN 'Menuju 20 Tahun'
+                        WHEN t.\"masaKerjaTahun\" >= (10 - {$nearYears}) THEN 'Menuju 10 Tahun'
                         ELSE NULL
-                    END as kategoriSatya"
+                    END as \"kategoriSatya\""
                 ),
+            ]);
+
+        $query = DB::query()->fromSub($withStatus, 's')
+            ->select([
+                's.nipPegawai',
+                's.nama',
+                's.foto',
+                's.jabatan',
+                's.golongan',
+                's.tanggalMasuk',
+                's.masaKerjaTahun',
+                's.masaKerjaBulan',
+                's.statusSatya',
+                's.kategoriSatya',
             ])
-            ->whereRaw(
-                "CASE
-                    WHEN t.masaKerjaTahun >= 30 THEN 'memenuhi'
-                    WHEN t.masaKerjaTahun >= 20 THEN 'memenuhi'
-                    WHEN t.masaKerjaTahun >= 10 THEN 'memenuhi'
-                    WHEN t.masaKerjaTahun >= (30 - {$nearYears}) THEN 'mendekati'
-                    WHEN t.masaKerjaTahun >= (20 - {$nearYears}) THEN 'mendekati'
-                    WHEN t.masaKerjaTahun >= (10 - {$nearYears}) THEN 'mendekati'
-                    ELSE 'belum'
-                END <> 'belum'"
-            );
+            ->where('s.statusSatya', '<>', 'belum');
 
         if ($q !== '') {
             $query->where(function ($sub) use ($q) {
-                $sub->where('t.nama', 'ilike', "%{$q}%")
-                    ->orWhere('t.nipPegawai', 'ilike', "%{$q}%")
-                    ->orWhere('t.jabatan', 'ilike', "%{$q}%");
+                $sub->where('s.nama', 'ilike', "%{$q}%")
+                    ->orWhere('s.nipPegawai', 'ilike', "%{$q}%")
+                    ->orWhere('s.jabatan', 'ilike', "%{$q}%");
             });
         }
 
@@ -307,6 +316,7 @@ class CareerController extends Controller
             ->select([
                 'p.nipPegawai',
                 'p.nama',
+                'p.foto',
                 'p.jabatan',
                 DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan) as golongan"),
                 DB::raw("COALESCE(rp.\"tmtPangkat\", p.\"tanggalMasuk\", k.\"tmtCpns\", k.\"tmtPns\") as \"tmtGolonganAktif\""),

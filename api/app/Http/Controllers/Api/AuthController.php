@@ -68,6 +68,10 @@ class AuthController extends Controller
 
     private function verifyTurnstile(string $token, ?string $ip): bool
     {
+        if (app()->environment('local')) {
+            return true;
+        }
+
         $secret = config('services.turnstile.secret');
 
         if (!$secret) {
