@@ -40,7 +40,6 @@ export default function LoginPage() {
   const turnstileSiteKey = import.meta.env
     .VITE_TURNSTILE_SITE_KEY as string | undefined;
   const disableTurnstile =
-    import.meta.env.DEV ||
     String(import.meta.env.VITE_DISABLE_TURNSTILE ?? "false").toLowerCase() === "true";
 
   useEffect(() => {

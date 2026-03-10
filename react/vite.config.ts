@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./"),
       },
+      '/storage': {
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
     server: {
       proxy: {
