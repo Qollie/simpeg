@@ -39,6 +39,7 @@ const normalisasiStatusKarir = (p: any): string => {
 }
 
 const mapPegawaiForModal = (p: any): Pegawai => {
+  const identitasSrc = p.identitasResmi ?? p.identitas_resmi ?? {}
   const riwayatTerbaru = [...(p.riwayatPangkat ?? [])]
     .sort((a: any, b: any) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
 
@@ -46,6 +47,15 @@ const mapPegawaiForModal = (p: any): Pegawai => {
 
   return {
     ...p,
+    identitasResmi: {
+      nipIdResmi: identitasSrc.nipIdResmi ?? identitasSrc.nip_id_resmi ?? p.nipPegawai ?? "",
+      nik: identitasSrc.nik ?? "",
+      noBpjs: identitasSrc.noBpjs ?? identitasSrc.no_bpjs ?? "",
+      noNpwp: identitasSrc.noNpwp ?? identitasSrc.no_npwp ?? "",
+      karpeg: identitasSrc.karpeg ?? "",
+      karsuKarsi: identitasSrc.karsuKarsi ?? identitasSrc.karsu_karsi ?? "",
+      taspen: identitasSrc.taspen ?? "",
+    },
     departemen: p.kepegawaian?.jenisPegawai ?? p.departemen,
     status: p.status ?? p.kepegawaian?.statusPegawai ?? "Aktif",
     tanggalMasuk: p.tanggalMasuk ?? p.kepegawaian?.tmtCpns ?? p.kepegawaian?.tmtPns,
