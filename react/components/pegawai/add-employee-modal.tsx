@@ -25,7 +25,7 @@ import { departemenList, golonganList, statusList } from "@/lib/mock-data"
 interface AddEmployeeModalProps {
   isOpen: boolean
   onClose: () => void
-  onAdd: (pegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => void
+  onAdd: (pegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => Promise<void>
   existingPegawai?: Pegawai[]
   golonganOptions?: string[]
 }
@@ -109,6 +109,7 @@ export function AddEmployeeModal({
   const [dokumen, setDokumen] = useState<File[]>([])
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
   const handleInputChange = (
@@ -144,7 +145,7 @@ export function AddEmployeeModal({
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const requiredFields: (keyof FormState)[] = [
       "nipPegawai",
       "nama",
@@ -263,8 +264,19 @@ export function AddEmployeeModal({
       efiles,
     }
 
-    onAdd(newPegawai, dokumenObjects, fotoFile)
-    resetForm()
+    setSubmitting(true)
+    try {
+      await onAdd(newPegawai, dokumenObjects, fotoFile)
+      resetForm()
+    } catch (err: any) {
+      toast({
+        title: "Gagal menambah pegawai",
+        description: err?.message || "Terjadi kesalahan saat menyimpan data. Periksa data dan coba lagi.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const resetForm = () => {
@@ -840,11 +852,12 @@ export function AddEmployeeModal({
             variant="destructive"
             onClick={resetForm}
             className="text-xs sm:text-sm"
+            disabled={submitting}
           >
             Batal
           </Button>
-          <Button onClick={handleSubmit} className="bg-primary text-xs sm:text-sm">
-            Tambah Pegawai
+          <Button onClick={handleSubmit} className="bg-primary text-xs sm:text-sm" disabled={submitting}>
+            {submitting ? "Menyimpan..." : "Tambah Pegawai"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,6 +1,9 @@
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -69,6 +72,9 @@ export function ModalLihatPegawai({
     </div>
   )
 
+  const fallbackFoto = (nama: string) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=random&size=800`
+
   const previewDocument = async (file: any) => {
     try {
       setLoadingFileId(file.idFile)
@@ -119,13 +125,18 @@ export function ModalLihatPegawai({
   return (
     <Dialog open={terbuka} onOpenChange={tutup}>
       <DialogContent className="max-h-[90vh] h-[90vh] w-[95vw] md:w-[90vw] lg:min-w-[900px] max-w-5xl overflow-hidden p-0 border-none bg-card rounded-xl sm:rounded-2xl shadow-2xl flex flex-col [&>button]:hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Detail pegawai</DialogTitle>
+          <DialogDescription>Ringkasan data identitas dan kepegawaian pegawai</DialogDescription>
+        </DialogHeader>
         <div className="flex flex-col md:flex-row h-full overflow-y-auto md:overflow-hidden">
           
           {/* KIRI: Foto Full Cover dengan Info Overlay */}
           <div className="relative w-full md:w-[320px] lg:w-[480px] bg-muted flex-shrink-0 min-h-[250px] md:min-h-full p-0 overflow-hidden">
             {/* Foto Pegawai */}
-            <img 
-              src={pegawai.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random&size=800`} 
+            <img
+              src={pegawai.foto || fallbackFoto(pegawai.nama)}
+              onError={(e) => { e.currentTarget.src = fallbackFoto(pegawai.nama) }}
               alt={pegawai.nama}
               className="absolute inset-0 w-full h-full object-cover"
             />

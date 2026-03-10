@@ -19,6 +19,7 @@ import { AddEmployeeModal } from "@/components/pegawai/add-employee-modal"
 import { Button } from "@/components/ui/button"
 import { UserPlus, Users } from "lucide-react"
 import type { Pegawai, Dokumen } from "@/lib/types"
+import { apiFetch } from "@/lib/api"
 
 const apiBase = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") ?? ""
 
@@ -159,7 +160,7 @@ export default function PegawaiPage() {
         if (status && status !== 'Semua') params.set('status', status)
       if (searchQuery) params.set('q', searchQuery)
 
-      fetch(`${apiBase}/api/pegawai?` + params.toString(), { credentials: 'include' })
+      apiFetch(`${apiBase}/api/pegawai?` + params.toString(), { credentials: 'include' })
         .then((r) => r.json())
         .then((json) => {
           const items = json.data ?? json
@@ -267,7 +268,7 @@ export default function PegawaiPage() {
 
     formData.append('_method', 'PUT')
 
-    const response = await fetch(`${apiBase}/api/pegawai/${updatedPegawai.nipPegawai}`, {
+    const response = await apiFetch(`${apiBase}/api/pegawai/${updatedPegawai.nipPegawai}`, {
       method: 'POST',
       credentials: 'include',
       body: formData,
@@ -281,7 +282,7 @@ export default function PegawaiPage() {
   }
 
   const handleEditDocument = async (pegawaiId: string, dokumenId: string, namaFile: string) => {
-    const response = await fetch(`${apiBase}/api/documents/${dokumenId}`, {
+    const response = await apiFetch(`${apiBase}/api/documents/${dokumenId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -298,7 +299,7 @@ export default function PegawaiPage() {
   }
 
   const handleDeleteDocument = async (pegawaiId: string, dokumenId: string) => {
-    const response = await fetch(`${apiBase}/api/documents/${dokumenId}`, {
+    const response = await apiFetch(`${apiBase}/api/documents/${dokumenId}`, {
       method: 'DELETE',
       credentials: 'include',
     })
@@ -320,7 +321,7 @@ export default function PegawaiPage() {
     setReloadKey((v) => v + 1)
   }
 
-  const handleAddEmployee = async (newPegawai: Pegawai, dokumen: Dokumen[], fotoFile?: File | null) => {
+  const handleAddEmployee = async (newPegawai: Pegawai, _dokumen: Dokumen[], fotoFile?: File | null) => {
     const formData = new FormData()
 
     const put = (key: string, val: any) => {
@@ -363,7 +364,7 @@ export default function PegawaiPage() {
       formData.append('foto', fotoFile)
     }
 
-    const res = await fetch(`${apiBase}/api/pegawai`, {
+    const res = await apiFetch(`${apiBase}/api/pegawai`, {
       method: 'POST',
       credentials: 'include',
       body: formData,
@@ -373,23 +374,23 @@ export default function PegawaiPage() {
       let msg = 'Periksa data dan coba lagi.'
       try {
         const txt = await res.text()
-        msg = txt
         try {
           const err = JSON.parse(txt)
           msg = err?.message || JSON.stringify(err)
-        } catch {}
-        console.error('POST /api/pegawai failed', res.status, res.statusText, txt)
+        } catch {
+          msg = txt || msg
+        }
       } catch {}
-      toast({
-        title: 'Gagal menambah pegawai',
-        description: msg,
-        variant: 'destructive',
-      })
-      return
+      console.error('POST /api/pegawai failed', res.status, res.statusText, msg)
+      throw new Error(msg)
     }
 
     setReloadKey((v) => v + 1)
     setAddModal(false)
+    toast({
+      title: 'Berhasil',
+      description: `${newPegawai.nama} berhasil ditambahkan.`,
+    })
   }
 
   const handleAddDocument = async (pegawaiId: string, newFiles: File[]) => {
@@ -399,7 +400,7 @@ export default function PegawaiPage() {
       formData.append('jenisDokumen', (file.type?.split('/')[1] || 'FILE').toUpperCase())
       formData.append('namaFile', file.name)
 
-      const response = await fetch(`${apiBase}/api/pegawai/${pegawaiId}/documents`, {
+      const response = await apiFetch(`${apiBase}/api/pegawai/${pegawaiId}/documents`, {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -420,7 +421,7 @@ export default function PegawaiPage() {
     const handleConfirmDelete = async () => {
       if (!deleteDialog.pegawaiId) return
 
-      const res = await fetch(`${apiBase}/api/pegawai/${deleteDialog.pegawaiId}`, {
+      const res = await apiFetch(`${apiBase}/api/pegawai/${deleteDialog.pegawaiId}`, {
         method: 'DELETE',
         credentials: 'include',
       })

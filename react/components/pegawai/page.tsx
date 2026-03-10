@@ -264,23 +264,6 @@ export default function KarirPage() {
     return `Naik pangkat: ${careerSummary.promotionTotal} pegawai | Satyalancana: ${careerSummary.satyalancanaTotal} pegawai`
   }, [careerSummary.promotionTotal, careerSummary.satyalancanaTotal])
 
-  const handleDownloadPromotionCsv = () => {
-    const params = new URLSearchParams()
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
-    params.set("near_years", nearYears)
-
-    window.open(`/api/karir/naik-pangkat/export?${params.toString()}`, "_blank")
-  }
-
-  const handleDownloadSatyaCsv = () => {
-    const params = new URLSearchParams()
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
-    if (satyaStatus !== "semua") params.set("status", satyaStatus)
-    params.set("near_years", nearYears)
-
-    window.open(`/api/karir/satyalancana/export?${params.toString()}`, "_blank")
-  }
-
   return (
     <AdminLayout title="Peningkatan Karir">
       <div className="space-y-4 md:space-y-6">
@@ -341,12 +324,7 @@ export default function KarirPage() {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadPromotionCsv}>
-              <Download className="mr-1.5 h-3.5 w-3.5" /> Unduh CSV Naik Pangkat
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadSatyaCsv}>
-              <Download className="mr-1.5 h-3.5 w-3.5" /> Unduh CSV Satyalancana
-            </Button>
+            {/* Tombol unduh CSV dihapus sesuai permintaan */}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">{summaryText}</p>
         </div>

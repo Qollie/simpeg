@@ -108,6 +108,9 @@ function getInitials(nama: string): string {
 }
 
 export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageChange, lihatDetail }: PropsKelayakanKenaikanPangkat) {
+  const fallbackFoto = (nama: string, size = 160) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=random&size=${size}`
+
   return (
     <Card className="h-full min-h-[600px] flex flex-col border-border">
       <CardHeader className="pb-3 px-4 pt-4 md:px-6 md:pt-6">
@@ -145,7 +148,10 @@ export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageCha
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 border">
-                      <AvatarImage src={pegawai.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random`} />
+                      <AvatarImage
+                        src={pegawai.foto || fallbackFoto(pegawai.nama)}
+                        onError={(e) => { e.currentTarget.src = fallbackFoto(pegawai.nama) }}
+                      />
                       <AvatarFallback>{getInitials(pegawai.nama)}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
@@ -180,6 +186,9 @@ export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageCha
 }
 
 export function SatyalancanaKaryaSatya({ items, pagination, loading, onPageChange, lihatDetail }: PropsSatyalancanaKaryaSatya) {
+  const fallbackFoto = (nama: string, size = 160) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=random&size=${size}`
+
   return (
     <Card className="h-full min-h-[600px] flex flex-col border-border">
       <CardHeader className="pb-3 px-4 pt-4 md:px-6 md:pt-6">
@@ -217,7 +226,10 @@ export function SatyalancanaKaryaSatya({ items, pagination, loading, onPageChang
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 border">
-                      <AvatarImage src={pegawai.foto || `https://ui-avatars.com/api/?name=${encodeURIComponent(pegawai.nama)}&background=random`} />
+                      <AvatarImage
+                        src={pegawai.foto || fallbackFoto(pegawai.nama)}
+                        onError={(e) => { e.currentTarget.src = fallbackFoto(pegawai.nama) }}
+                      />
                       <AvatarFallback>{getInitials(pegawai.nama)}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
