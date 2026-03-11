@@ -24,6 +24,7 @@ import { apiFetch } from "@/lib/api"
 const apiBase = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") ?? ""
 
 type PegawaiApi = any
+type FieldErrors = Record<string, string>
 
 const normalizePegawaiFromApi = (p: PegawaiApi, reloadKey = 0): Pegawai => {
   const identitas = p.identitasResmi ?? p.identitas_resmi ?? {}
@@ -69,7 +70,7 @@ const normalizePegawaiFromApi = (p: PegawaiApi, reloadKey = 0): Pegawai => {
     jabatan: p.jabatan ?? undefined,
     departemen: p.departemen ?? jenisPegawai ?? "",
     golongan,
-    status: p.status ?? statusPegawai ?? "Aktif",
+    status: p.status ?? "Aktif",
     tanggalMasuk: p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns ?? undefined,
     email: p.email ?? undefined,
     noHp: p.noHp ?? "",
@@ -275,7 +276,29 @@ export default function PegawaiPage() {
     })
 
     if (!response.ok) {
-      throw new Error('Gagal menyimpan perubahan pegawai')
+      let msg = 'Gagal menyimpan perubahan pegawai'
+      let fieldErrors: FieldErrors | undefined
+      try {
+        const err = await response.json()
+        if (err?.errors && typeof err.errors === 'object') {
+          fieldErrors = Object.fromEntries(
+            Object.entries(err.errors).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? String(value[0] ?? '') : String(value ?? ''),
+            ])
+          )
+        }
+        msg = err?.message || msg
+      } catch {
+        try {
+          const txt = await response.text()
+          msg = txt || msg
+        } catch {}
+      }
+      const error = new Error(msg) as Error & { fieldErrors?: FieldErrors; status?: number }
+      error.fieldErrors = fieldErrors
+      error.status = response.status
+      throw error
     }
 
     setReloadKey((v) => v + 1)
@@ -372,17 +395,29 @@ export default function PegawaiPage() {
 
     if (!res.ok) {
       let msg = 'Periksa data dan coba lagi.'
+      let fieldErrors: FieldErrors | undefined
       try {
-        const txt = await res.text()
-        try {
-          const err = JSON.parse(txt)
-          msg = err?.message || JSON.stringify(err)
-        } catch {
-          msg = txt || msg
+        const err = await res.json()
+        if (err?.errors && typeof err.errors === 'object') {
+          fieldErrors = Object.fromEntries(
+            Object.entries(err.errors).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? String(value[0] ?? '') : String(value ?? ''),
+            ])
+          )
         }
-      } catch {}
+        msg = err?.message || msg
+      } catch {
+        try {
+          const txt = await res.text()
+          msg = txt || msg
+        } catch {}
+      }
       console.error('POST /api/pegawai failed', res.status, res.statusText, msg)
-      throw new Error(msg)
+      const error = new Error(msg) as Error & { fieldErrors?: FieldErrors; status?: number }
+      error.fieldErrors = fieldErrors
+      error.status = res.status
+      throw error
     }
 
     setReloadKey((v) => v + 1)

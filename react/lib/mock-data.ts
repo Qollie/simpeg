@@ -7,7 +7,7 @@ export const mockPegawai: Pegawai[] = [
     gelarDepan: "Dr.",
     gelarBelakang: "S.H., M.H.",
     jabatan: "Kepala Dinas",
-    departemen: "KEPALA DINAS",
+    departemen: "Kepala Dinas",
     golongan: "Pembina Utama Muda (IV/c)",
     status: "Aktif",
     tanggalMasuk: "2010-01-15",
@@ -348,7 +348,7 @@ export const mockStatistik: StatistikDashboard = {
 
 export const departemenList = [
   "Semua",
-  "KEPALA DINAS",
+  "Kepala Dinas",
   "Pelayanan Pendaftaran Penduduk",
   "Pelayanan Pencatatan Sipil",
   "Pengelolaan Informasi Administrasi Kependudukan",

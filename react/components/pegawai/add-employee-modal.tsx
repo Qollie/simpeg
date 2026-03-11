@@ -21,6 +21,7 @@ import { Upload, X, Camera, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Pegawai, Dokumen, EfilePegawai } from "@/lib/types"
 import { departemenList, golonganList, statusList } from "@/lib/mock-data"
+import { cn } from "@/lib/utils"
 
 interface AddEmployeeModalProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu",
 const jenisKelaminList = ["Laki-laki", "Perempuan"]
 const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
 const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
+const MAX_FOTO_SIZE_BYTES = 5 * 1024 * 1024
 
 type FormState = {
   nipPegawai: string
@@ -64,6 +66,63 @@ type FormState = {
   tmtPns: string
   masaKerjaTahun: string
   masaKerjaBulan: string
+}
+
+type FormErrors = Partial<Record<keyof FormState, string>>
+
+const fieldLabels: Partial<Record<keyof FormState, string>> = {
+  nipPegawai: "NIP",
+  nama: "Nama",
+  gelarDepan: "Gelar depan",
+  gelarBelakang: "Gelar belakang",
+  jabatan: "Jabatan",
+  departemen: "Departemen",
+  golongan: "Golongan",
+  status: "Status pegawai internal",
+  tanggalMasuk: "Tanggal masuk",
+  email: "Email",
+  noHp: "No. HP",
+  tempatLahir: "Tempat lahir",
+  tanggalLahir: "Tanggal lahir",
+  jenisKelamin: "Jenis kelamin",
+  agama: "Agama",
+  alamat: "Alamat",
+  nik: "NIK",
+  noBpjs: "No. BPJS",
+  noNpwp: "No. NPWP",
+  karpeg: "Karpeg",
+  karsuKarsi: "Karsu/Karsi",
+  taspen: "Taspen",
+  statusPegawai: "Status pegawai",
+  jenisPegawai: "Jenis pegawai",
+  tmtCpns: "TMT CPNS",
+  tmtPns: "TMT PNS",
+  masaKerjaTahun: "Masa kerja (tahun)",
+  masaKerjaBulan: "Masa kerja (bulan)",
+}
+
+const maxLengthRules: Partial<Record<keyof FormState, number>> = {
+  nipPegawai: 18,
+  nama: 150,
+  gelarDepan: 50,
+  gelarBelakang: 50,
+  jabatan: 150,
+  departemen: 150,
+  golongan: 100,
+  status: 20,
+  email: 120,
+  noHp: 20,
+  tempatLahir: 100,
+  jenisKelamin: 10,
+  agama: 20,
+  nik: 16,
+  noBpjs: 20,
+  noNpwp: 25,
+  karpeg: 30,
+  karsuKarsi: 30,
+  taspen: 30,
+  statusPegawai: 20,
+  jenisPegawai: 50,
 }
 
 const initialForm: FormState = {
@@ -105,6 +164,7 @@ export function AddEmployeeModal({
   golonganOptions = [],
 }: AddEmployeeModalProps) {
   const [formData, setFormData] = useState<FormState>(initialForm)
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
 
   const [dokumen, setDokumen] = useState<File[]>([])
   const [fotoFile, setFotoFile] = useState<File | null>(null)
@@ -117,10 +177,22 @@ export function AddEmployeeModal({
   ) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+    setFieldErrors((prev) => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name as keyof FormErrors]
+      return next
+    })
   }
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
+    setFieldErrors((prev) => {
+      if (!(name in prev)) return prev
+      const next = { ...prev }
+      delete next[name as keyof FormErrors]
+      return next
+    })
   }
 
   const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,6 +208,15 @@ export function AddEmployeeModal({
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
+      if (file.size > MAX_FOTO_SIZE_BYTES) {
+        toast({
+          title: "Foto terlalu besar",
+          description: "Ukuran foto maksimal 5 MB.",
+          variant: "destructive",
+        })
+        e.target.value = ""
+        return
+      }
       setFotoFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -168,11 +249,55 @@ export function AddEmployeeModal({
       "masaKerjaBulan",
     ]
 
-    const missing = requiredFields.filter((field) => !`${formData[field]}`.trim())
-    if (missing.length > 0) {
+    const nextErrors: FormErrors = {}
+
+    requiredFields.forEach((field) => {
+      if (!`${formData[field]}`.trim()) {
+        nextErrors[field] = "Kolom ini wajib diisi."
+      }
+    })
+
+    ;(Object.keys(maxLengthRules) as (keyof FormState)[]).forEach((field) => {
+      const maxLength = maxLengthRules[field]
+      const value = `${formData[field] ?? ""}`.trim()
+      if (!maxLength || !value) return
+      if (value.length > maxLength) {
+        const label = fieldLabels[field] ?? field
+        nextErrors[field] = `${label} maksimal ${maxLength} karakter.`
+      }
+    })
+
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      nextErrors.email = "Format email tidak valid."
+    }
+
+    if (formData.nipPegawai.trim() && !/^\d{18}$/.test(formData.nipPegawai.trim())) {
+      nextErrors.nipPegawai = "NIP harus terdiri dari 18 digit."
+    }
+
+    if (formData.nik.trim() && !/^\d{16}$/.test(formData.nik.trim())) {
+      nextErrors.nik = "NIK harus terdiri dari 16 digit."
+    }
+
+    if (formData.masaKerjaTahun.trim()) {
+      const tahun = Number(formData.masaKerjaTahun)
+      if (!Number.isInteger(tahun) || tahun < 0) {
+        nextErrors.masaKerjaTahun = "Masa kerja tahun harus bilangan bulat 0 atau lebih."
+      }
+    }
+
+    if (formData.masaKerjaBulan.trim()) {
+      const bulan = Number(formData.masaKerjaBulan)
+      if (!Number.isInteger(bulan) || bulan < 0 || bulan > 11) {
+        nextErrors.masaKerjaBulan = "Masa kerja bulan harus antara 0 sampai 11."
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
       toast({
         title: "Validasi Gagal",
-        description: "Harap isi semua field wajib bertanda * sesuai kolom database.",
+        description: "Periksa kembali data yang ditandai pada form.",
         variant: "destructive",
       })
       return
@@ -197,6 +322,22 @@ export function AddEmployeeModal({
 
     if (duplicates.length > 0) {
       const uniq = Array.from(new Set(duplicates))
+      const duplicateFieldMap: Record<string, keyof FormState> = {
+        NIP: "nipPegawai",
+        Email: "email",
+        NIK: "nik",
+        "No. BPJS": "noBpjs",
+        "No. NPWP": "noNpwp",
+        Karpeg: "karpeg",
+        "Karsu/Karsi": "karsuKarsi",
+        Taspen: "taspen",
+      }
+      const nextErrors = uniq.reduce<FormErrors>((acc, label) => {
+        const key = duplicateFieldMap[label]
+        if (key) acc[key] = `${label} sudah digunakan.`
+        return acc
+      }, {})
+      setFieldErrors(nextErrors)
       toast({
         title: "Kode sudah digunakan",
         description: `Kolom ${uniq.join(", ")} tidak boleh sama dengan pegawai lain.`,
@@ -265,10 +406,14 @@ export function AddEmployeeModal({
     }
 
     setSubmitting(true)
+    setFieldErrors({})
     try {
       await onAdd(newPegawai, dokumenObjects, fotoFile)
       resetForm()
     } catch (err: any) {
+      if (err?.fieldErrors && typeof err.fieldErrors === "object") {
+        setFieldErrors(err.fieldErrors as FormErrors)
+      }
       toast({
         title: "Gagal menambah pegawai",
         description: err?.message || "Terjadi kesalahan saat menyimpan data. Periksa data dan coba lagi.",
@@ -281,10 +426,26 @@ export function AddEmployeeModal({
 
   const resetForm = () => {
     setFormData(initialForm)
+    setFieldErrors({})
     setDokumen([])
     setFotoFile(null)
     setFotoPreview(null)
     onClose()
+  }
+
+  const getFieldError = (field: keyof FormState) => fieldErrors[field]
+
+  const getInputClassName = (field: keyof FormState) =>
+    cn("bg-secondary text-sm", getFieldError(field) && "border-destructive focus-visible:ring-destructive/20")
+
+  const getSelectClassName = (field: keyof FormState, baseClassName = "bg-secondary text-sm") =>
+    cn(baseClassName, getFieldError(field) && "border-destructive")
+
+  const renderFieldError = (field: keyof FormState) => {
+    const message = getFieldError(field)
+    if (!message) return null
+
+    return <p className="text-xs text-destructive">{message}</p>
   }
 
   return (
@@ -333,8 +494,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor Induk Pegawai"
                   value={formData.nipPegawai}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("nipPegawai"))}
+                  className={getInputClassName("nipPegawai")}
                 />
+                {renderFieldError("nipPegawai")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="nama" className="text-sm">
@@ -346,8 +509,10 @@ export function AddEmployeeModal({
                   placeholder="Nama lengkap"
                   value={formData.nama}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("nama"))}
+                  className={getInputClassName("nama")}
                 />
+                {renderFieldError("nama")}
               </div>
             </div>
 
@@ -362,8 +527,10 @@ export function AddEmployeeModal({
                   placeholder="Dr."
                   value={formData.gelarDepan}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("gelarDepan"))}
+                  className={getInputClassName("gelarDepan")}
                 />
+                {renderFieldError("gelarDepan")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="gelarBelakang" className="text-sm">
@@ -375,8 +542,10 @@ export function AddEmployeeModal({
                   placeholder="S.Kom"
                   value={formData.gelarBelakang}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("gelarBelakang"))}
+                  className={getInputClassName("gelarBelakang")}
                 />
+                {renderFieldError("gelarBelakang")}
               </div>
             </div>
 
@@ -391,8 +560,10 @@ export function AddEmployeeModal({
                   placeholder="Posisi/Jabatan"
                   value={formData.jabatan}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("jabatan"))}
+                  className={getInputClassName("jabatan")}
                 />
+                {renderFieldError("jabatan")}
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="departemen" className="text-xs sm:text-sm">
@@ -404,7 +575,10 @@ export function AddEmployeeModal({
                     handleSelectChange("departemen", value)
                   }
                 >
-                  <SelectTrigger className="w-full bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("departemen"))}
+                    className={getSelectClassName("departemen", "w-full bg-secondary text-sm")}
+                  >
                     <SelectValue placeholder="Pilih departemen" />
                   </SelectTrigger>
                   <SelectContent>
@@ -417,6 +591,7 @@ export function AddEmployeeModal({
                       ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("departemen")}
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="golongan" className="text-xs sm:text-sm">
@@ -428,7 +603,10 @@ export function AddEmployeeModal({
                     handleSelectChange("golongan", value)
                   }
                 >
-                  <SelectTrigger className="w-full bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("golongan"))}
+                    className={getSelectClassName("golongan", "w-full bg-secondary text-sm")}
+                  >
                     <SelectValue placeholder="Pilih golongan" />
                   </SelectTrigger>
                   <SelectContent>
@@ -439,6 +617,7 @@ export function AddEmployeeModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("golongan")}
               </div>
             </div>
 
@@ -451,7 +630,10 @@ export function AddEmployeeModal({
                   value={formData.status}
                   onValueChange={(value) => handleSelectChange("status", value)}
                 >
-                  <SelectTrigger className="bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("status"))}
+                    className={getSelectClassName("status")}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -462,6 +644,7 @@ export function AddEmployeeModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("status")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tanggalMasuk" className="text-sm">
@@ -473,8 +656,10 @@ export function AddEmployeeModal({
                   type="date"
                   value={formData.tanggalMasuk}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("tanggalMasuk"))}
+                  className={getInputClassName("tanggalMasuk")}
                 />
+                {renderFieldError("tanggalMasuk")}
               </div>
             </div>
           </div>
@@ -493,8 +678,10 @@ export function AddEmployeeModal({
                   placeholder="Kota kelahiran"
                   value={formData.tempatLahir}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("tempatLahir"))}
+                  className={getInputClassName("tempatLahir")}
                 />
+                {renderFieldError("tempatLahir")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tanggalLahir" className="text-sm">
@@ -506,8 +693,10 @@ export function AddEmployeeModal({
                   type="date"
                   value={formData.tanggalLahir}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("tanggalLahir"))}
+                  className={getInputClassName("tanggalLahir")}
                 />
+                {renderFieldError("tanggalLahir")}
               </div>
             </div>
 
@@ -520,7 +709,10 @@ export function AddEmployeeModal({
                   value={formData.jenisKelamin}
                   onValueChange={(value) => handleSelectChange("jenisKelamin", value)}
                 >
-                  <SelectTrigger className="bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("jenisKelamin"))}
+                    className={getSelectClassName("jenisKelamin")}
+                  >
                     <SelectValue placeholder="Pilih" />
                   </SelectTrigger>
                   <SelectContent>
@@ -529,6 +721,7 @@ export function AddEmployeeModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("jenisKelamin")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agama" className="text-sm">Agama <span className="text-destructive">*</span></Label>
@@ -536,7 +729,10 @@ export function AddEmployeeModal({
                   value={formData.agama}
                   onValueChange={(value) => handleSelectChange("agama", value)}
                 >
-                  <SelectTrigger className="bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("agama"))}
+                    className={getSelectClassName("agama")}
+                  >
                     <SelectValue placeholder="Pilih" />
                   </SelectTrigger>
                   <SelectContent>
@@ -545,6 +741,7 @@ export function AddEmployeeModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("agama")}
               </div>
             </div>
 
@@ -556,8 +753,10 @@ export function AddEmployeeModal({
                 placeholder="Jl. Contoh No. 123, RT 01 RW 02"
                 value={formData.alamat}
                 onChange={handleInputChange}
-                className="bg-secondary text-sm"
+                aria-invalid={Boolean(getFieldError("alamat"))}
+                className={getInputClassName("alamat")}
               />
+              {renderFieldError("alamat")}
             </div>
           </div>
 
@@ -576,8 +775,10 @@ export function AddEmployeeModal({
                   placeholder="email@example.com"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("email"))}
+                  className={getInputClassName("email")}
                 />
+                {renderFieldError("email")}
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="noHp" className="text-xs sm:text-sm">
@@ -589,8 +790,10 @@ export function AddEmployeeModal({
                   placeholder="081234567890"
                   value={formData.noHp}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("noHp"))}
+                  className={getInputClassName("noHp")}
                 />
+                {renderFieldError("noHp")}
               </div>
             </div>
           </div>
@@ -609,8 +812,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor Induk Kependudukan"
                   value={formData.nik}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("nik"))}
+                  className={getInputClassName("nik")}
                 />
+                {renderFieldError("nik")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="noBpjs" className="text-sm">
@@ -622,8 +827,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor BPJS"
                   value={formData.noBpjs}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("noBpjs"))}
+                  className={getInputClassName("noBpjs")}
                 />
+                {renderFieldError("noBpjs")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="noNpwp" className="text-sm">
@@ -635,8 +842,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor NPWP"
                   value={formData.noNpwp}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("noNpwp"))}
+                  className={getInputClassName("noNpwp")}
                 />
+                {renderFieldError("noNpwp")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="karpeg" className="text-sm">
@@ -648,8 +857,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor Karpeg"
                   value={formData.karpeg}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("karpeg"))}
+                  className={getInputClassName("karpeg")}
                 />
+                {renderFieldError("karpeg")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="karsuKarsi" className="text-sm">
@@ -661,8 +872,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor Karsu/Karsi"
                   value={formData.karsuKarsi}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("karsuKarsi"))}
+                  className={getInputClassName("karsuKarsi")}
                 />
+                {renderFieldError("karsuKarsi")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="taspen" className="text-sm">
@@ -674,8 +887,10 @@ export function AddEmployeeModal({
                   placeholder="Nomor Taspen"
                   value={formData.taspen}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("taspen"))}
+                  className={getInputClassName("taspen")}
                 />
+                {renderFieldError("taspen")}
               </div>
             </div>
           </div>
@@ -692,7 +907,10 @@ export function AddEmployeeModal({
                   value={formData.statusPegawai}
                   onValueChange={(value) => handleSelectChange("statusPegawai", value)}
                 >
-                  <SelectTrigger className="bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("statusPegawai"))}
+                    className={getSelectClassName("statusPegawai")}
+                  >
                     <SelectValue placeholder="Pilih status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -703,6 +921,7 @@ export function AddEmployeeModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("statusPegawai")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="jenisPegawai" className="text-sm">
@@ -712,7 +931,10 @@ export function AddEmployeeModal({
                   value={formData.jenisPegawai}
                   onValueChange={(value) => handleSelectChange("jenisPegawai", value)}
                 >
-                  <SelectTrigger className="bg-secondary text-sm">
+                  <SelectTrigger
+                    aria-invalid={Boolean(getFieldError("jenisPegawai"))}
+                    className={getSelectClassName("jenisPegawai")}
+                  >
                     <SelectValue placeholder="Pilih jenis pegawai" />
                   </SelectTrigger>
                   <SelectContent>
@@ -723,6 +945,7 @@ export function AddEmployeeModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {renderFieldError("jenisPegawai")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tmtCpns" className="text-sm">
@@ -734,8 +957,10 @@ export function AddEmployeeModal({
                   type="date"
                   value={formData.tmtCpns}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("tmtCpns"))}
+                  className={getInputClassName("tmtCpns")}
                 />
+                {renderFieldError("tmtCpns")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tmtPns" className="text-sm">
@@ -747,8 +972,10 @@ export function AddEmployeeModal({
                   type="date"
                   value={formData.tmtPns}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("tmtPns"))}
+                  className={getInputClassName("tmtPns")}
                 />
+                {renderFieldError("tmtPns")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="masaKerjaTahun" className="text-sm">
@@ -761,8 +988,10 @@ export function AddEmployeeModal({
                   min="0"
                   value={formData.masaKerjaTahun}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("masaKerjaTahun"))}
+                  className={getInputClassName("masaKerjaTahun")}
                 />
+                {renderFieldError("masaKerjaTahun")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="masaKerjaBulan" className="text-sm">
@@ -775,8 +1004,10 @@ export function AddEmployeeModal({
                   min="0"
                   value={formData.masaKerjaBulan}
                   onChange={handleInputChange}
-                  className="bg-secondary text-sm"
+                  aria-invalid={Boolean(getFieldError("masaKerjaBulan"))}
+                  className={getInputClassName("masaKerjaBulan")}
                 />
+                {renderFieldError("masaKerjaBulan")}
               </div>
             </div>
           </div>

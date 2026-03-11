@@ -22,11 +22,64 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import type { IdentitasResmi, Kepegawaian, Pegawai } from "@/lib/types"
 import { departemenList, statusList, golonganList } from "@/lib/mock-data"
+import { cn } from "@/lib/utils"
 
 const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"]
 const jenisKelaminList = ["Laki-laki", "Perempuan"]
 const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
 const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
+const MAX_FOTO_SIZE_BYTES = 5 * 1024 * 1024
+
+type FormErrors = Record<string, string>
+
+const fieldLabels: Record<string, string> = {
+  nama: "Nama",
+  jabatan: "Jabatan",
+  departemen: "Departemen",
+  golongan: "Golongan",
+  status: "Status",
+  tanggalMasuk: "Tanggal masuk",
+  tempatLahir: "Tempat lahir",
+  tanggalLahir: "Tanggal lahir",
+  jenisKelamin: "Jenis kelamin",
+  agama: "Agama",
+  alamat: "Alamat",
+  noHp: "No. HP",
+  email: "Email",
+  "identitasResmi.nik": "NIK",
+  "identitasResmi.noBpjs": "No. BPJS",
+  "identitasResmi.noNpwp": "No. NPWP",
+  "identitasResmi.karpeg": "Karpeg",
+  "identitasResmi.karsuKarsi": "Karsu/Karsi",
+  "identitasResmi.taspen": "Taspen",
+  "kepegawaian.statusPegawai": "Status pegawai",
+  "kepegawaian.jenisPegawai": "Jenis pegawai",
+  "kepegawaian.tmtCpns": "TMT CPNS",
+  "kepegawaian.tmtPns": "TMT PNS",
+  "kepegawaian.masaKerjaTahun": "Masa kerja (tahun)",
+  "kepegawaian.masaKerjaBulan": "Masa kerja (bulan)",
+}
+
+const maxLengthRules: Record<string, number> = {
+  nama: 150,
+  jabatan: 150,
+  departemen: 150,
+  golongan: 100,
+  status: 20,
+  tempatLahir: 100,
+  jenisKelamin: 10,
+  agama: 20,
+  email: 120,
+  noHp: 20,
+  "identitasResmi.nik": 16,
+  "identitasResmi.noBpjs": 20,
+  "identitasResmi.noNpwp": 25,
+  "identitasResmi.karpeg": 30,
+  "identitasResmi.karsuKarsi": 30,
+  "identitasResmi.taspen": 30,
+  "kepegawaian.statusPegawai": 20,
+  "kepegawaian.jenisPegawai": 50,
+}
 
 const ensureIdentitasResmi = (pegawai: Pegawai, current?: Partial<IdentitasResmi>): IdentitasResmi => ({
   nipIdResmi: current?.nipIdResmi ?? pegawai.identitasResmi?.nipIdResmi ?? pegawai.nipPegawai,
@@ -52,7 +105,7 @@ interface EditEmployeeModalProps {
   pegawai: Pegawai | null
   isOpen: boolean
   onClose: () => void
-  onSave: (pegawai: Pegawai, fotoFile?: File | null) => void
+  onSave: (pegawai: Pegawai, fotoFile?: File | null) => Promise<void>
   existingPegawai?: Pegawai[]
 }
 
@@ -65,6 +118,8 @@ export function EditEmployeeModal({
 }: EditEmployeeModalProps) {
   const [formData, setFormData] = useState<Partial<Pegawai>>({})
   const [fotoFile, setFotoFile] = useState<File | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
+  const [saving, setSaving] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -77,10 +132,61 @@ export function EditEmployeeModal({
         kepegawaian: ensureKepegawaian(pegawai, pegawai.kepegawaian),
       })
       setFotoFile(null)
+      setFieldErrors({})
     }
   }, [pegawai])
 
-  const handleSubmit = (e: FormEvent) => {
+  const getVal = (path: string, source = formData) => {
+    const parts = path.split(".")
+    return parts.reduce<any>((acc, key) => (acc ? acc[key as keyof typeof acc] : undefined), source)
+  }
+
+  const clearFieldError = (path: string) => {
+    setFieldErrors((prev) => {
+      if (!(path in prev)) return prev
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+  }
+
+  const updateRootField = <K extends keyof Pegawai>(key: K, value: Pegawai[K]) => {
+    setFormData((prev) => ({ ...prev, [key]: value }))
+    clearFieldError(String(key))
+  }
+
+  const updateIdentitasField = (key: keyof IdentitasResmi, value: IdentitasResmi[keyof IdentitasResmi]) => {
+    setFormData((prev) => ({
+      ...prev,
+      identitasResmi: ensureIdentitasResmi(pegawai!, { ...prev.identitasResmi, [key]: value }),
+    }))
+    clearFieldError(`identitasResmi.${String(key)}`)
+  }
+
+  const updateKepegawaianField = (key: keyof Kepegawaian, value: Kepegawaian[keyof Kepegawaian]) => {
+    setFormData((prev) => ({
+      ...prev,
+      kepegawaian: ensureKepegawaian(pegawai!, { ...prev.kepegawaian, [key]: value }),
+    }))
+    clearFieldError(`kepegawaian.${String(key)}`)
+  }
+
+  const getFieldError = (path: string) => fieldErrors[path]
+
+  const getInputClassName = (path: string) =>
+    cn("bg-secondary text-sm", getFieldError(path) && "border-destructive focus-visible:ring-destructive/20")
+
+  const getSelectClassName = (path: string, baseClassName = "bg-secondary text-sm") =>
+    cn(baseClassName, getFieldError(path) && "border-destructive")
+
+  const renderFieldError = (path: string) => {
+    const message = getFieldError(path)
+    if (!message) return null
+
+    return <p className="text-xs text-destructive">{message}</p>
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!pegawai) return
 
@@ -103,10 +209,7 @@ export function EditEmployeeModal({
       "kepegawaian.tmtCpns",
     ]
 
-    const getVal = (path: string) => {
-      const parts = path.split(".")
-      return parts.reduce<any>((acc, key) => (acc ? acc[key as keyof typeof acc] : undefined), formData)
-    }
+    const nextErrors: FormErrors = {}
 
     const missing = requiredFields.filter((key) => {
       if (key.includes(".")) return !`${getVal(key) ?? ""}`.trim()
@@ -115,9 +218,50 @@ export function EditEmployeeModal({
     })
 
     if (missing.length > 0) {
+      missing.forEach((field) => {
+        nextErrors[String(field)] = "Kolom ini wajib diisi."
+      })
+    }
+
+    Object.entries(maxLengthRules).forEach(([path, maxLength]) => {
+      const value = `${getVal(path) ?? ""}`.trim()
+      if (!value) return
+      if (value.length > maxLength) {
+        nextErrors[path] = `${fieldLabels[path] ?? path} maksimal ${maxLength} karakter.`
+      }
+    })
+
+    const email = `${formData.email ?? ""}`.trim()
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nextErrors.email = "Format email tidak valid."
+    }
+
+    const nik = `${formData.identitasResmi?.nik ?? ""}`.trim()
+    if (nik && !/^\d{16}$/.test(nik)) {
+      nextErrors["identitasResmi.nik"] = "NIK harus terdiri dari 16 digit."
+    }
+
+    const tahun = formData.kepegawaian?.masaKerjaTahun
+    if (tahun !== undefined && `${tahun}` !== "") {
+      const tahunNum = Number(tahun)
+      if (!Number.isInteger(tahunNum) || tahunNum < 0) {
+        nextErrors["kepegawaian.masaKerjaTahun"] = "Masa kerja tahun harus bilangan bulat 0 atau lebih."
+      }
+    }
+
+    const bulan = formData.kepegawaian?.masaKerjaBulan
+    if (bulan !== undefined && `${bulan}` !== "") {
+      const bulanNum = Number(bulan)
+      if (!Number.isInteger(bulanNum) || bulanNum < 0 || bulanNum > 11) {
+        nextErrors["kepegawaian.masaKerjaBulan"] = "Masa kerja bulan harus antara 0 sampai 11."
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
       toast({
         title: "Validasi Gagal",
-        description: "Harap isi semua field bertanda *.",
+        description: "Periksa kembali data yang ditandai pada form.",
         variant: "destructive",
       })
       return
@@ -144,6 +288,21 @@ export function EditEmployeeModal({
 
     if (duplicates.length > 0) {
       const uniq = Array.from(new Set(duplicates))
+      const duplicateFieldMap: Record<string, string> = {
+        Email: "email",
+        NIK: "identitasResmi.nik",
+        "No. BPJS": "identitasResmi.noBpjs",
+        "No. NPWP": "identitasResmi.noNpwp",
+        Karpeg: "identitasResmi.karpeg",
+        "Karsu/Karsi": "identitasResmi.karsuKarsi",
+        Taspen: "identitasResmi.taspen",
+      }
+      const duplicateErrors = uniq.reduce<FormErrors>((acc, label) => {
+        const key = duplicateFieldMap[label]
+        if (key) acc[key] = `${label} sudah digunakan.`
+        return acc
+      }, {})
+      setFieldErrors(duplicateErrors)
       toast({
         title: "Kode sudah digunakan",
         description: `Kolom ${uniq.join(", ")} tidak boleh sama dengan pegawai lain.`,
@@ -176,12 +335,37 @@ export function EditEmployeeModal({
       kepegawaian: mergedKepegawaian,
     } as Pegawai
 
-    onSave(payload, fotoFile)
-    toast({
-      title: "Data berhasil disimpan",
-      description: `Data pegawai ${formData.nama} telah diperbarui.`,
-    })
-    onClose()
+    setSaving(true)
+    setFieldErrors({})
+    try {
+      await onSave(payload, fotoFile)
+      toast({
+        title: "Data berhasil disimpan",
+        description: `Data pegawai ${formData.nama} telah diperbarui.`,
+      })
+      onClose()
+    } catch (err: any) {
+      if (err?.fieldErrors && typeof err.fieldErrors === "object") {
+        const mapped = Object.fromEntries(
+          Object.entries(err.fieldErrors).map(([key, value]) => {
+            const normalizedKey = ["nik", "noBpjs", "noNpwp", "karpeg", "karsuKarsi", "taspen"].includes(key)
+              ? `identitasResmi.${key}`
+              : ["statusPegawai", "jenisPegawai", "tmtCpns", "tmtPns", "masaKerjaTahun", "masaKerjaBulan"].includes(key)
+                ? `kepegawaian.${key}`
+                : key
+            return [normalizedKey, String(value)]
+          })
+        )
+        setFieldErrors(mapped)
+      }
+      toast({
+        title: "Gagal menyimpan perubahan",
+        description: err?.message || "Terjadi kesalahan saat menyimpan data.",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!pegawai) return null
@@ -218,7 +402,19 @@ export function EditEmployeeModal({
                 id="foto"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setFotoFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null
+                  if (file && file.size > MAX_FOTO_SIZE_BYTES) {
+                    toast({
+                      title: "Foto terlalu besar",
+                      description: "Ukuran foto maksimal 5 MB.",
+                      variant: "destructive",
+                    })
+                    e.target.value = ""
+                    return
+                  }
+                  setFotoFile(file)
+                }}
                 className="bg-secondary text-sm"
               />
               <p className="text-xs text-muted-foreground">Format gambar, maks 5MB.</p>
@@ -234,9 +430,7 @@ export function EditEmployeeModal({
               <Input
                 id="nipPegawai"
                 value={formData.nipPegawai || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, nipPegawai: e.target.value })
-                }
+                onChange={(e) => updateRootField("nipPegawai", e.target.value)}
                 className="bg-secondary text-sm"
                 disabled
               />
@@ -248,11 +442,11 @@ export function EditEmployeeModal({
               <Input
                 id="nama"
                 value={formData.nama || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, nama: e.target.value })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateRootField("nama", e.target.value)}
+                aria-invalid={Boolean(getFieldError("nama"))}
+                className={getInputClassName("nama")}
               />
+              {renderFieldError("nama")}
             </div>
           </div>
 
@@ -264,11 +458,11 @@ export function EditEmployeeModal({
               <Input
                 id="jabatan"
                 value={formData.jabatan || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, jabatan: e.target.value })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateRootField("jabatan", e.target.value)}
+                aria-invalid={Boolean(getFieldError("jabatan"))}
+                className={getInputClassName("jabatan")}
               />
+              {renderFieldError("jabatan")}
             </div>
             <div className="space-y-1.5 sm:space-y-2">
               <Label htmlFor="departemen" className="text-xs sm:text-sm">
@@ -276,11 +470,12 @@ export function EditEmployeeModal({
               </Label>
               <Select
                 value={formData.departemen}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, departemen: value })
-                }
+                onValueChange={(value) => updateRootField("departemen", value)}
               >
-                <SelectTrigger className="w-full bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("departemen"))}
+                  className={getSelectClassName("departemen", "w-full bg-secondary text-sm")}
+                >
                   <SelectValue placeholder="Pilih departemen" />
                 </SelectTrigger>
                 <SelectContent>
@@ -293,6 +488,7 @@ export function EditEmployeeModal({
                     ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("departemen")}
             </div>
             <div className="space-y-1.5 sm:space-y-2">
               <Label htmlFor="golongan" className="text-xs sm:text-sm">
@@ -300,11 +496,12 @@ export function EditEmployeeModal({
               </Label>
               <Select
                 value={formData.golongan}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, golongan: value })
-                }
+                onValueChange={(value) => updateRootField("golongan", value)}
               >
-                <SelectTrigger className="w-full bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("golongan"))}
+                  className={getSelectClassName("golongan", "w-full bg-secondary text-sm")}
+                >
                   <SelectValue placeholder="Pilih golongan" />
                 </SelectTrigger>
                 <SelectContent>
@@ -315,6 +512,7 @@ export function EditEmployeeModal({
                   ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("golongan")}
             </div>
           </div>
 
@@ -328,11 +526,11 @@ export function EditEmployeeModal({
               <Input
                 id="tempatLahir"
                 value={formData.tempatLahir || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, tempatLahir: e.target.value })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateRootField("tempatLahir", e.target.value)}
+                aria-invalid={Boolean(getFieldError("tempatLahir"))}
+                className={getInputClassName("tempatLahir")}
               />
+              {renderFieldError("tempatLahir")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="tanggalLahir" className="text-sm text-foreground">
@@ -342,11 +540,11 @@ export function EditEmployeeModal({
                 id="tanggalLahir"
                 type="date"
                 value={formData.tanggalLahir || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, tanggalLahir: e.target.value })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateRootField("tanggalLahir", e.target.value)}
+                aria-invalid={Boolean(getFieldError("tanggalLahir"))}
+                className={getInputClassName("tanggalLahir")}
               />
+              {renderFieldError("tanggalLahir")}
             </div>
           </div>
 
@@ -357,11 +555,12 @@ export function EditEmployeeModal({
               </Label>
               <Select
                 value={formData.jenisKelamin}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, jenisKelamin: value })
-                }
+                onValueChange={(value) => updateRootField("jenisKelamin", value)}
               >
-                <SelectTrigger className="bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("jenisKelamin"))}
+                  className={getSelectClassName("jenisKelamin")}
+                >
                   <SelectValue placeholder="Pilih" />
                 </SelectTrigger>
                 <SelectContent>
@@ -370,16 +569,18 @@ export function EditEmployeeModal({
                   ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("jenisKelamin")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="agama" className="text-sm text-foreground">Agama <span className="text-destructive">*</span></Label>
               <Select
                 value={formData.agama}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, agama: value })
-                }
+                onValueChange={(value) => updateRootField("agama", value)}
               >
-                <SelectTrigger className="bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("agama"))}
+                  className={getSelectClassName("agama")}
+                >
                   <SelectValue placeholder="Pilih" />
                 </SelectTrigger>
                 <SelectContent>
@@ -388,6 +589,7 @@ export function EditEmployeeModal({
                   ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("agama")}
             </div>
           </div>
 
@@ -398,9 +600,11 @@ export function EditEmployeeModal({
             <Input
               id="alamat"
               value={formData.alamat || ""}
-              onChange={(e) => setFormData({ ...formData, alamat: e.target.value })}
-              className="bg-secondary text-sm"
+              onChange={(e) => updateRootField("alamat", e.target.value)}
+              aria-invalid={Boolean(getFieldError("alamat"))}
+              className={getInputClassName("alamat")}
             />
+            {renderFieldError("alamat")}
           </div>
 
           {/* Status & Kontak Section */}
@@ -412,14 +616,12 @@ export function EditEmployeeModal({
               </Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    status: value as Pegawai["status"],
-                  })
-                }
+                onValueChange={(value) => updateRootField("status", value as Pegawai["status"])}
               >
-                <SelectTrigger className="bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("status"))}
+                  className={getSelectClassName("status")}
+                >
                   <SelectValue placeholder="Pilih Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -430,6 +632,7 @@ export function EditEmployeeModal({
                   ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("status")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="tanggalMasuk" className="text-sm text-foreground">
@@ -439,11 +642,11 @@ export function EditEmployeeModal({
                 id="tanggalMasuk"
                 type="date"
                 value={formData.tanggalMasuk || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, tanggalMasuk: e.target.value })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateRootField("tanggalMasuk", e.target.value)}
+                aria-invalid={Boolean(getFieldError("tanggalMasuk"))}
+                className={getInputClassName("tanggalMasuk")}
               />
+              {renderFieldError("tanggalMasuk")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="noHp" className="text-sm text-foreground">
@@ -452,11 +655,11 @@ export function EditEmployeeModal({
               <Input
                 id="noHp"
                 value={formData.noHp || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, noHp: e.target.value })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateRootField("noHp", e.target.value)}
+                aria-invalid={Boolean(getFieldError("noHp"))}
+                className={getInputClassName("noHp")}
               />
+              {renderFieldError("noHp")}
             </div>
           </div>
 
@@ -468,11 +671,11 @@ export function EditEmployeeModal({
               id="email"
               type="email"
               value={formData.email || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              className="bg-secondary text-sm"
+              onChange={(e) => updateRootField("email", e.target.value)}
+              aria-invalid={Boolean(getFieldError("email"))}
+              className={getInputClassName("email")}
             />
+            {renderFieldError("email")}
           </div>
 
           {/* Identitas Resmi */}
@@ -485,14 +688,11 @@ export function EditEmployeeModal({
               <Input
                 id="nik"
                 value={formData.identitasResmi?.nik || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, nik: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateIdentitasField("nik", e.target.value)}
+                aria-invalid={Boolean(getFieldError("identitasResmi.nik"))}
+                className={getInputClassName("identitasResmi.nik")}
               />
+              {renderFieldError("identitasResmi.nik")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="noBpjs" className="text-sm text-foreground">
@@ -501,14 +701,11 @@ export function EditEmployeeModal({
               <Input
                 id="noBpjs"
                 value={formData.identitasResmi?.noBpjs || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, noBpjs: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateIdentitasField("noBpjs", e.target.value)}
+                aria-invalid={Boolean(getFieldError("identitasResmi.noBpjs"))}
+                className={getInputClassName("identitasResmi.noBpjs")}
               />
+              {renderFieldError("identitasResmi.noBpjs")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="noNpwp" className="text-sm text-foreground">
@@ -517,14 +714,11 @@ export function EditEmployeeModal({
               <Input
                 id="noNpwp"
                 value={formData.identitasResmi?.noNpwp || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, noNpwp: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateIdentitasField("noNpwp", e.target.value)}
+                aria-invalid={Boolean(getFieldError("identitasResmi.noNpwp"))}
+                className={getInputClassName("identitasResmi.noNpwp")}
               />
+              {renderFieldError("identitasResmi.noNpwp")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="karpeg" className="text-sm text-foreground">
@@ -533,14 +727,11 @@ export function EditEmployeeModal({
               <Input
                 id="karpeg"
                 value={formData.identitasResmi?.karpeg || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, karpeg: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateIdentitasField("karpeg", e.target.value)}
+                aria-invalid={Boolean(getFieldError("identitasResmi.karpeg"))}
+                className={getInputClassName("identitasResmi.karpeg")}
               />
+              {renderFieldError("identitasResmi.karpeg")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="karsuKarsi" className="text-sm text-foreground">
@@ -549,14 +740,11 @@ export function EditEmployeeModal({
               <Input
                 id="karsuKarsi"
                 value={formData.identitasResmi?.karsuKarsi || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, karsuKarsi: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateIdentitasField("karsuKarsi", e.target.value)}
+                aria-invalid={Boolean(getFieldError("identitasResmi.karsuKarsi"))}
+                className={getInputClassName("identitasResmi.karsuKarsi")}
               />
+              {renderFieldError("identitasResmi.karsuKarsi")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="taspen" className="text-sm text-foreground">
@@ -565,14 +753,11 @@ export function EditEmployeeModal({
               <Input
                 id="taspen"
                 value={formData.identitasResmi?.taspen || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    identitasResmi: ensureIdentitasResmi(pegawai, { ...formData.identitasResmi, taspen: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateIdentitasField("taspen", e.target.value)}
+                aria-invalid={Boolean(getFieldError("identitasResmi.taspen"))}
+                className={getInputClassName("identitasResmi.taspen")}
               />
+              {renderFieldError("identitasResmi.taspen")}
             </div>
           </div>
 
@@ -585,14 +770,12 @@ export function EditEmployeeModal({
               </Label>
               <Select
                 value={formData.kepegawaian?.statusPegawai}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, statusPegawai: value }),
-                  })
-                }
+                onValueChange={(value) => updateKepegawaianField("statusPegawai", value)}
               >
-                <SelectTrigger className="bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("kepegawaian.statusPegawai"))}
+                  className={getSelectClassName("kepegawaian.statusPegawai")}
+                >
                   <SelectValue placeholder="Pilih Status Pegawai" />
                 </SelectTrigger>
                 <SelectContent>
@@ -603,6 +786,7 @@ export function EditEmployeeModal({
                   ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("kepegawaian.statusPegawai")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="jenisPegawai" className="text-sm text-foreground">
@@ -610,14 +794,12 @@ export function EditEmployeeModal({
               </Label>
               <Select
                 value={formData.kepegawaian?.jenisPegawai}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, jenisPegawai: value }),
-                  })
-                }
+                onValueChange={(value) => updateKepegawaianField("jenisPegawai", value)}
               >
-                <SelectTrigger className="bg-secondary text-sm">
+                <SelectTrigger
+                  aria-invalid={Boolean(getFieldError("kepegawaian.jenisPegawai"))}
+                  className={getSelectClassName("kepegawaian.jenisPegawai")}
+                >
                   <SelectValue placeholder="Pilih Jenis Pegawai" />
                 </SelectTrigger>
                 <SelectContent>
@@ -628,6 +810,7 @@ export function EditEmployeeModal({
                   ))}
                 </SelectContent>
               </Select>
+              {renderFieldError("kepegawaian.jenisPegawai")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="tmtCpns" className="text-sm text-foreground">
@@ -637,14 +820,11 @@ export function EditEmployeeModal({
                 id="tmtCpns"
                 type="date"
                 value={formData.kepegawaian?.tmtCpns || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, tmtCpns: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateKepegawaianField("tmtCpns", e.target.value)}
+                aria-invalid={Boolean(getFieldError("kepegawaian.tmtCpns"))}
+                className={getInputClassName("kepegawaian.tmtCpns")}
               />
+              {renderFieldError("kepegawaian.tmtCpns")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="tmtPns" className="text-sm text-foreground">
@@ -654,14 +834,11 @@ export function EditEmployeeModal({
                 id="tmtPns"
                 type="date"
                 value={formData.kepegawaian?.tmtPns || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    kepegawaian: ensureKepegawaian(pegawai, { ...formData.kepegawaian, tmtPns: e.target.value }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateKepegawaianField("tmtPns", e.target.value)}
+                aria-invalid={Boolean(getFieldError("kepegawaian.tmtPns"))}
+                className={getInputClassName("kepegawaian.tmtPns")}
               />
+              {renderFieldError("kepegawaian.tmtPns")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="masaKerjaTahun" className="text-sm text-foreground">
@@ -672,17 +849,11 @@ export function EditEmployeeModal({
                 type="number"
                 min="0"
                 value={formData.kepegawaian?.masaKerjaTahun ?? ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    kepegawaian: ensureKepegawaian(pegawai, {
-                      ...formData.kepegawaian,
-                      masaKerjaTahun: e.target.value === "" ? 0 : Number(e.target.value),
-                    }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateKepegawaianField("masaKerjaTahun", e.target.value === "" ? 0 : Number(e.target.value))}
+                aria-invalid={Boolean(getFieldError("kepegawaian.masaKerjaTahun"))}
+                className={getInputClassName("kepegawaian.masaKerjaTahun")}
               />
+              {renderFieldError("kepegawaian.masaKerjaTahun")}
             </div>
             <div className="space-y-2">
               <Label htmlFor="masaKerjaBulan" className="text-sm text-foreground">
@@ -693,26 +864,20 @@ export function EditEmployeeModal({
                 type="number"
                 min="0"
                 value={formData.kepegawaian?.masaKerjaBulan ?? ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    kepegawaian: ensureKepegawaian(pegawai, {
-                      ...formData.kepegawaian,
-                      masaKerjaBulan: e.target.value === "" ? 0 : Number(e.target.value),
-                    }),
-                  })
-                }
-                className="bg-secondary text-sm"
+                onChange={(e) => updateKepegawaianField("masaKerjaBulan", e.target.value === "" ? 0 : Number(e.target.value))}
+                aria-invalid={Boolean(getFieldError("kepegawaian.masaKerjaBulan"))}
+                className={getInputClassName("kepegawaian.masaKerjaBulan")}
               />
+              {renderFieldError("kepegawaian.masaKerjaBulan")}
             </div>
           </div>
 
           <DialogFooter className="gap-2 pt-4 flex-col-reverse sm:flex-row">
-            <Button type="button" variant="outline" onClick={onClose} className="text-sm">
+            <Button type="button" variant="outline" onClick={onClose} className="text-sm" disabled={saving}>
               Batal
             </Button>
-            <Button type="submit" className="bg-primary text-primary-foreground text-sm">
-              Simpan Perubahan
+            <Button type="submit" className="bg-primary text-primary-foreground text-sm" disabled={saving}>
+              {saving ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </DialogFooter>
         </form>

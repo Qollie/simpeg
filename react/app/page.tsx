@@ -33,7 +33,7 @@ export default function HalamanDashboard() {
         const totalPegawai = items.length
         const totalDokumen = items.reduce((sum, p) => sum + ((p.efiles ?? []).length || 0), 0)
         const pegawaiCuti = items.filter((p) => {
-          const status = String(p?.kepegawaian?.statusPegawai ?? p?.status ?? '').toLowerCase()
+          const status = String(p?.status ?? p?.kepegawaian?.statusPegawai ?? '').toLowerCase()
           return status.includes('cuti')
         }).length
         const pegawaiAktif = totalPegawai - pegawaiCuti

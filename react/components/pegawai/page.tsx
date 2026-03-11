@@ -126,14 +126,14 @@ export default function KarirPage() {
         if (!mounted) return
         const items: any[] = json.data ?? []
 
-        const mapped: Pegawai[] = items.map((p: any) => {
+        const mapped: PromotionEligibilityItem[] = items.map((p: any) => {
           const identitas = p.identitasResmi ?? p.identitas_resmi ?? {}
           const kepegawaianRaw = p.kepegawaian ?? {}
           const riwayatPangkatRaw = p.riwayatPangkat ?? p.riwayat_pangkat ?? []
 
           const kepegawaian = {
             ...kepegawaianRaw,
-            statusPegawai: kepegawaianRaw.statusPegawai ?? p.status ?? "Aktif",
+            statusPegawai: kepegawaianRaw.statusPegawai ?? "",
             jenisPegawai: kepegawaianRaw.jenisPegawai ?? p.departemen ?? "-",
             tmtCpns: kepegawaianRaw.tmtCpns ?? p.tmtCpns ?? p.tanggalMasuk ?? null,
             tmtPns: kepegawaianRaw.tmtPns ?? p.tmtPns ?? null,
@@ -165,10 +165,12 @@ export default function KarirPage() {
             tanggalMasuk: p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
             golongan,
             tmtGolongan: riwayatTerbaru?.tmtPangkat ?? p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
+            masaKerjaGolonganTahun: Number(p.masaKerjaGolonganTahun ?? p.masaKerjaGolonganTahun ?? 0),
+            masaKerjaGolonganBulan: Number(p.masaKerjaGolonganBulan ?? p.masaKerjaGolonganBulan ?? 0),
           }
         })
 
-        setPromotionItems(mapped as PromotionEligibilityItem[])
+        setPromotionItems(mapped)
         setPromotionPagination({
           currentPage: json.current_page ?? 1,
           lastPage: json.last_page ?? 1,
