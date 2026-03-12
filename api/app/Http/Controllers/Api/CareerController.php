@@ -324,7 +324,13 @@ class CareerController extends Controller
                 'p.foto',
                 'p.jabatan',
                 DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan) as golongan"),
-                DB::raw("COALESCE(rp.\"tmtPangkat\", p.\"tanggalMasuk\", k.\"tmtCpns\", k.\"tmtPns\") as \"tmtGolonganAktif\""),
+                DB::raw(
+                    "CASE
+                        WHEN LOWER(COALESCE(k.\"statusPegawai\", '')) = 'pns'
+                            THEN COALESCE(rp.\"tmtPangkat\", k.\"tmtPns\", k.\"tmtCpns\", p.\"tanggalMasuk\")
+                        ELSE COALESCE(rp.\"tmtPangkat\", k.\"tmtCpns\", k.\"tmtPns\", p.\"tanggalMasuk\")
+                    END as \"tmtGolonganAktif\""
+                ),
                 DB::raw("COALESCE(p.\"tanggalMasuk\", k.\"tmtCpns\", k.\"tmtPns\") as \"tanggalMasuk\""),
                 DB::raw($this->rankCaseExpression("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan)") . ' as "rankOrder"'),
             ])
