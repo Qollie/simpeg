@@ -36,6 +36,11 @@ const jenisKelaminList = ["Laki-laki", "Perempuan"]
 const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
 const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
 const MAX_FOTO_SIZE_BYTES = 5 * 1024 * 1024
+const today = new Date()
+const todayString = today.toISOString().split("T")[0]
+const minimumBirthDate = new Date(today)
+minimumBirthDate.setFullYear(minimumBirthDate.getFullYear() - 17)
+const maximumBirthDateString = minimumBirthDate.toISOString().split("T")[0]
 
 type FormState = {
   nipPegawai: string
@@ -277,6 +282,26 @@ export function AddEmployeeModal({
 
     if (formData.nik.trim() && !/^\d{16}$/.test(formData.nik.trim())) {
       nextErrors.nik = "NIK harus terdiri dari 16 digit."
+    }
+
+    const validateDateNotAfterToday = (field: keyof FormState, label: string) => {
+      const value = `${formData[field] ?? ""}`.trim()
+      if (!value) return
+      if (value > todayString) {
+        nextErrors[field] = `${label} tidak boleh melebihi tanggal hari ini.`
+      }
+    }
+
+    validateDateNotAfterToday("tanggalMasuk", "Tanggal masuk")
+    validateDateNotAfterToday("tmtCpns", "TMT CPNS")
+    validateDateNotAfterToday("tmtPns", "TMT PNS")
+
+    if (formData.tanggalLahir.trim()) {
+      if (formData.tanggalLahir > todayString) {
+        nextErrors.tanggalLahir = "Tanggal lahir tidak boleh melebihi tanggal hari ini."
+      } else if (formData.tanggalLahir > maximumBirthDateString) {
+        nextErrors.tanggalLahir = "Tanggal lahir harus menunjukkan usia minimal 17 tahun."
+      }
     }
 
     if (formData.masaKerjaTahun.trim()) {
@@ -654,6 +679,7 @@ export function AddEmployeeModal({
                   id="tanggalMasuk"
                   name="tanggalMasuk"
                   type="date"
+                  max={todayString}
                   value={formData.tanggalMasuk}
                   onChange={handleInputChange}
                   aria-invalid={Boolean(getFieldError("tanggalMasuk"))}
@@ -691,6 +717,7 @@ export function AddEmployeeModal({
                   id="tanggalLahir"
                   name="tanggalLahir"
                   type="date"
+                  max={maximumBirthDateString}
                   value={formData.tanggalLahir}
                   onChange={handleInputChange}
                   aria-invalid={Boolean(getFieldError("tanggalLahir"))}
@@ -955,6 +982,7 @@ export function AddEmployeeModal({
                   id="tmtCpns"
                   name="tmtCpns"
                   type="date"
+                  max={todayString}
                   value={formData.tmtCpns}
                   onChange={handleInputChange}
                   aria-invalid={Boolean(getFieldError("tmtCpns"))}
@@ -970,6 +998,7 @@ export function AddEmployeeModal({
                   id="tmtPns"
                   name="tmtPns"
                   type="date"
+                  max={todayString}
                   value={formData.tmtPns}
                   onChange={handleInputChange}
                   aria-invalid={Boolean(getFieldError("tmtPns"))}

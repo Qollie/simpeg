@@ -8,6 +8,7 @@ use App\Models\Kepegawaian;
 use App\Models\IdentitasResmi;
 use App\Models\Pangkat;
 use App\Models\Pegawai;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
+    private function maximumBirthDate(): string
+    {
+        return Carbon::today()->subYears(17)->toDateString();
+    }
+
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 15);
@@ -113,7 +119,7 @@ class PegawaiController extends Controller
             'gelarDepan' => ['nullable', 'string', 'max:50'],
             'gelarBelakang' => ['nullable', 'string', 'max:50'],
             'tempatLahir' => ['required', 'string', 'max:100'],
-            'tanggalLahir' => ['required', 'date'],
+            'tanggalLahir' => ['required', 'date', 'before_or_equal:'.$this->maximumBirthDate()],
             'jenisKelamin' => ['required', 'string', 'max:10'],
             'agama' => ['required', 'string', 'max:20'],
             'alamat' => ['nullable', 'string'],
@@ -123,7 +129,7 @@ class PegawaiController extends Controller
             'golongan' => ['required', 'string', 'max:100'],
             'status' => ['required', 'string', 'max:20'],
             'departemen' => ['required', 'string', 'max:150'],
-            'tanggalMasuk' => ['required', 'date'],
+            'tanggalMasuk' => ['required', 'date', 'before_or_equal:today'],
             'foto' => ['nullable', 'file', 'image', 'max:5120'],
 
             // Identitas resmi
@@ -137,8 +143,8 @@ class PegawaiController extends Controller
             // Kepegawaian
             'statusPegawai' => ['required', 'string', 'max:20'],
             'jenisPegawai' => ['required', 'string', 'max:50'],
-            'tmtCpns' => ['required', 'date'],
-            'tmtPns' => ['nullable', 'date'],
+            'tmtCpns' => ['required', 'date', 'before_or_equal:today'],
+            'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
             'masaKerjaTahun' => ['required', 'integer', 'min:0'],
             'masaKerjaBulan' => ['required', 'integer', 'min:0', 'max:11'],
         ]);
@@ -213,7 +219,7 @@ class PegawaiController extends Controller
             'gelarDepan' => ['nullable', 'string', 'max:50'],
             'gelarBelakang' => ['nullable', 'string', 'max:50'],
             'tempatLahir' => ['nullable', 'string', 'max:100'],
-            'tanggalLahir' => ['nullable', 'date'],
+            'tanggalLahir' => ['nullable', 'date', 'before_or_equal:'.$this->maximumBirthDate()],
             'jenisKelamin' => ['nullable', 'string', 'max:10'],
             'agama' => ['nullable', 'string', 'max:20'],
             'alamat' => ['nullable', 'string'],
@@ -223,7 +229,7 @@ class PegawaiController extends Controller
             'golongan' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'string', 'max:20'],
             'departemen' => ['nullable', 'string', 'max:150'],
-            'tanggalMasuk' => ['nullable', 'date'],
+            'tanggalMasuk' => ['nullable', 'date', 'before_or_equal:today'],
             'foto' => ['nullable', 'file', 'image', 'max:5120'],
 
             // Identitas resmi
@@ -237,8 +243,8 @@ class PegawaiController extends Controller
             // Kepegawaian
             'statusPegawai' => ['nullable', 'string', 'max:20'],
             'jenisPegawai' => ['nullable', 'string', 'max:50'],
-            'tmtCpns' => ['nullable', 'date'],
-            'tmtPns' => ['nullable', 'date'],
+            'tmtCpns' => ['nullable', 'date', 'before_or_equal:today'],
+            'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
             'masaKerjaTahun' => ['nullable', 'integer', 'min:0'],
             'masaKerjaBulan' => ['nullable', 'integer', 'min:0', 'max:11'],
         ]);
