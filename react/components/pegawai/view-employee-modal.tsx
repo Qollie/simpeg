@@ -72,6 +72,59 @@ export function ModalLihatPegawai({
     </div>
   )
 
+  const fallbackFoto = (name?: string) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "Pegawai")}&background=random&size=800`
+
+  const previewDocument = async (file: any) => {
+    try {
+      setLoadingFileId(file.idFile)
+
+      const response = await fetch(`/api/documents/${file.idFile}/stream`)
+      if (!response.ok) {
+        const detail = await response.text()
+        if (file.filePath) {
+          window.open(file.filePath, "_blank", "noopener,noreferrer")
+          return
+        }
+        throw new Error(`Status ${response.status}: ${detail || "Gagal memuat dokumen"}`)
+      }
+
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      window.open(objectUrl, "_blank", "noopener,noreferrer")
+    } catch (err: any) {
+      console.error(err)
+      alert(`Tidak bisa menampilkan dokumen. ${String(err?.message || "")}`.trim())
+    } finally {
+      setLoadingFileId(null)
+    }
+  }
+
+  const downloadDocument = async (file: any) => {
+    try {
+      setLoadingFileId(file.idFile)
+
+      const response = await fetch(`/api/documents/${file.idFile}/download`)
+      if (!response.ok) {
+        const detail = await response.text()
+        throw new Error(`Status ${response.status}: ${detail || "Gagal mengunduh dokumen"}`)
+      }
+
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = objectUrl
+      anchor.download = file.namaFile || "dokumen"
+      anchor.click()
+      URL.revokeObjectURL(objectUrl)
+    } catch (err: any) {
+      console.error(err)
+      alert(`Tidak bisa mengunduh dokumen. ${String(err?.message || "")}`.trim())
+    } finally {
+      setLoadingFileId(null)
+    }
+  }
+
   return (
     <Dialog open={terbuka} onOpenChange={tutup}>
       <DialogContent className="max-h-[90vh] h-[90vh] w-[95vw] md:w-[90vw] lg:min-w-[900px] max-w-5xl overflow-hidden p-0 border-none bg-card rounded-xl sm:rounded-2xl shadow-2xl flex flex-col [&>button]:hidden">

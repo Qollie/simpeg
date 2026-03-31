@@ -18,5 +18,5 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/api/, '/api'),
       },
     },
-  };
+  },
 });
