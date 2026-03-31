@@ -741,8 +741,8 @@ export function AddEmployeeModal({
           {/* Kepegawaian Section */}
           <div className="space-y-3 sm:space-y-4">
             <h3 className="text-sm sm:text-base font-semibold text-foreground">Data Kepegawaian</h3>
-            <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-12">
-              <div className="space-y-2 xl:col-span-2">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-2">
                 <Label htmlFor="statusPegawai" className="text-sm">
                   Status Pegawai <span className="text-destructive">*</span>
                 </Label>
@@ -766,7 +766,7 @@ export function AddEmployeeModal({
                 </Select>
                 {renderFieldError("statusPegawai")}
               </div>
-              <div className="space-y-2 xl:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="jenisPegawai" className="text-sm">
                   Jenis Pegawai <span className="text-destructive">*</span>
                 </Label>
@@ -790,7 +790,7 @@ export function AddEmployeeModal({
                 </Select>
                 {renderFieldError("jenisPegawai")}
               </div>
-              <div className="space-y-2 xl:col-span-4">
+              <div className="space-y-2">
                 <Label htmlFor="tmtCpns" className="text-sm">
                   TMT CPNS
                 </Label>
@@ -806,7 +806,7 @@ export function AddEmployeeModal({
                 />
                 {renderFieldError("tmtCpns")}
               </div>
-              <div className="space-y-2 xl:col-span-4">
+              <div className="space-y-2">
                 <Label htmlFor="tmtPns" className="text-sm">
                   TMT PNS
                 </Label>

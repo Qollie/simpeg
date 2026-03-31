@@ -683,8 +683,8 @@ export function EditEmployeeModal({
 
           {/* Data Kepegawaian */}
           <h3 className="text-base font-semibold text-foreground border-b border-border pb-2 pt-2">Data Kepegawaian</h3>
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-12">
-            <div className="space-y-2 xl:col-span-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2">
               <Label htmlFor="statusPegawai" className="text-sm text-foreground">
                 Status Pegawai <span className="text-destructive">*</span>
               </Label>
@@ -708,7 +708,7 @@ export function EditEmployeeModal({
               </Select>
               {renderFieldError("kepegawaian.statusPegawai")}
             </div>
-            <div className="space-y-2 xl:col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="jenisPegawai" className="text-sm text-foreground">
                 Jenis Pegawai <span className="text-destructive">*</span>
               </Label>
@@ -732,7 +732,7 @@ export function EditEmployeeModal({
               </Select>
               {renderFieldError("kepegawaian.jenisPegawai")}
             </div>
-            <div className="space-y-2 xl:col-span-4">
+            <div className="space-y-2">
               <Label htmlFor="tmtCpns" className="text-sm text-foreground">
                 TMT CPNS
               </Label>
@@ -747,7 +747,7 @@ export function EditEmployeeModal({
               />
               {renderFieldError("kepegawaian.tmtCpns")}
             </div>
-            <div className="space-y-2 xl:col-span-4">
+            <div className="space-y-2">
               <Label htmlFor="tmtPns" className="text-sm text-foreground">
                 TMT PNS
               </Label>
