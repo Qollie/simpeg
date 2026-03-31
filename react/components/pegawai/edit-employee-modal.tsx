@@ -71,7 +71,7 @@ export function EditEmployeeModal({
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
-  const calculatedMasaKerja = calculateMasaKerja(formData.kepegawaian?.tmtCpns)
+  const calculatedMasaKerja = calculateMasaKerja(formData.kepegawaian?.tmtPns)
 
   useEffect(() => {
     if (pegawai) {
@@ -112,17 +112,17 @@ export function EditEmployeeModal({
     setFormData((prev) => ({
       ...prev,
       kepegawaian:
-        key === "tmtCpns"
+        key === "tmtPns"
           ? ensureKepegawaian(pegawai!, {
               ...prev.kepegawaian,
-              tmtCpns: value as string,
+              tmtPns: value as string,
               masaKerjaTahun: calculateMasaKerja((value as string) || "").tahun,
               masaKerjaBulan: calculateMasaKerja((value as string) || "").bulan,
             })
           : ensureKepegawaian(pegawai!, { ...prev.kepegawaian, [key]: value }),
     }))
     clearFieldError(`kepegawaian.${String(key)}`)
-    if (key === "tmtCpns") {
+    if (key === "tmtPns") {
       clearFieldError("kepegawaian.masaKerjaTahun")
       clearFieldError("kepegawaian.masaKerjaBulan")
     }

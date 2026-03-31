@@ -73,18 +73,18 @@ export function AddEmployeeModal({
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
-  const calculatedMasaKerja = calculateMasaKerja(formData.tmtCpns)
+  const calculatedMasaKerja = calculateMasaKerja(formData.tmtPns)
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target
     setFormData((prev) => {
-      if (name === "tmtCpns") {
+      if (name === "tmtPns") {
         const masaKerja = calculateMasaKerja(value)
         return {
           ...prev,
-          tmtCpns: value,
+          tmtPns: value,
           masaKerjaTahun: String(masaKerja.tahun),
           masaKerjaBulan: String(masaKerja.bulan),
         }
@@ -95,7 +95,7 @@ export function AddEmployeeModal({
     setFieldErrors((prev) => {
       const next = { ...prev }
       delete next[name as keyof FormErrors]
-      if (name === "tmtCpns") {
+      if (name === "tmtPns") {
         delete next.masaKerjaTahun
         delete next.masaKerjaBulan
       }

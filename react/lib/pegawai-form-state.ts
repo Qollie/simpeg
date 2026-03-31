@@ -84,7 +84,7 @@ export const ensureKepegawaian = (pegawai: Pegawai, current?: Partial<Kepegawaia
 })
 
 export const normalizePegawaiToEditForm = (pegawai: Pegawai): Partial<Pegawai> => {
-  const masaKerja = calculateMasaKerja(pegawai.kepegawaian?.tmtCpns ?? pegawai.tanggalMasuk ?? "")
+  const masaKerja = calculateMasaKerja(pegawai.kepegawaian?.tmtPns ?? pegawai.tanggalMasuk ?? "")
 
   return {
     ...pegawai,
