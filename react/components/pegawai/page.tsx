@@ -351,6 +351,9 @@ export default function KarirPage() {
       ? "h-9 rounded-md border-green-200 bg-green-50/70 text-green-700"
       : "h-9 rounded-md border-amber-200 bg-amber-50/70 text-amber-700"
 
+  const processStatusLabel = (status: "blm" | "sdh diproses") =>
+    status === "sdh diproses" ? "Sudah Diproses" : "Belum Diproses"
+
   return (
     <AdminLayout title="Peningkatan Karir">
       <div className="space-y-4 md:space-y-6">
@@ -480,7 +483,7 @@ export default function KarirPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={`rounded-full text-[11px] ${processStatusBadgeClass(item.status)}`}>
-                            {item.status}
+                            {processStatusLabel(item.status)}
                           </Badge>
                           <Select
                             value={item.status}
@@ -490,8 +493,8 @@ export default function KarirPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="blm">blm</SelectItem>
-                              <SelectItem value="sdh diproses">sdh diproses</SelectItem>
+                              <SelectItem value="blm">Belum Diproses</SelectItem>
+                              <SelectItem value="sdh diproses">Sudah Diproses</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
