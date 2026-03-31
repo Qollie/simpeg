@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 
 const DEFAULT_PAGINATION: PaginationMeta = {
   currentPage: 1,
@@ -340,6 +341,16 @@ export default function KarirPage() {
     }
   }
 
+  const processStatusBadgeClass = (status: "blm" | "sdh diproses") =>
+    status === "sdh diproses"
+      ? "border-green-200 bg-green-100 text-green-700"
+      : "border-amber-200 bg-amber-100 text-amber-700"
+
+  const processStatusSelectClass = (status: "blm" | "sdh diproses") =>
+    status === "sdh diproses"
+      ? "h-9 rounded-md border-green-200 bg-green-50/70 text-green-700"
+      : "h-9 rounded-md border-amber-200 bg-amber-50/70 text-amber-700"
+
   return (
     <AdminLayout title="Peningkatan Karir">
       <div className="space-y-4 md:space-y-6">
@@ -422,52 +433,68 @@ export default function KarirPage() {
           />
         </div>
 
-        <div className="rounded-lg border border-border/60 bg-card p-3 md:p-4">
-          <p className="text-sm font-semibold">Status Proses Karir</p>
-          <p className="mt-1 text-xs text-muted-foreground">Pantau data sudah diproses atau belum berdasarkan ID.</p>
+        <div className="rounded-xl border border-border/60 bg-card p-3 shadow-sm md:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold tracking-tight">Status Proses Karir</p>
+              <p className="mt-1 text-xs text-muted-foreground">Pantau progres pemrosesan karir per pegawai.</p>
+            </div>
+            <Badge variant="outline" className="rounded-full border-border/70 bg-muted/40 px-2.5 py-1 text-[11px]">
+              {processItems.length} data
+            </Badge>
+          </div>
 
-          <div className="mt-3">
+          <div className="mt-3 overflow-hidden rounded-lg border border-border/70">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[110px]">ID</TableHead>
-                  <TableHead>NIP</TableHead>
-                  <TableHead>Nama</TableHead>
-                  <TableHead className="w-[180px]">Status</TableHead>
+                <TableRow className="bg-muted/35">
+                  <TableHead className="w-[90px] text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">ID</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">NIP</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nama Pegawai</TableHead>
+                  <TableHead className="w-[220px] text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status Proses</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {processLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-4">
+                    <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
                       Memuat status proses...
                     </TableCell>
                   </TableRow>
                 ) : processItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-4">
+                    <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
                       Data status proses belum tersedia.
                     </TableCell>
                   </TableRow>
                 ) : (
                   processItems.map((item) => (
-                    <TableRow key={item.nipPegawai}>
-                      <TableCell>{item.id}</TableCell>
-                      <TableCell>{item.nipPegawai}</TableCell>
-                      <TableCell>{item.nama}</TableCell>
+                    <TableRow key={item.nipPegawai} className="transition-colors hover:bg-muted/25">
                       <TableCell>
-                        <Select
-                          value={item.status}
-                          onValueChange={(value) => handleChangeProcessStatus(item, value as "blm" | "sdh diproses")}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="blm">blm</SelectItem>
-                            <SelectItem value="sdh diproses">sdh diproses</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px]">
+                          #{item.id}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-[12px]">{item.nipPegawai}</TableCell>
+                      <TableCell className="font-medium">{item.nama}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={`rounded-full text-[11px] ${processStatusBadgeClass(item.status)}`}>
+                            {item.status}
+                          </Badge>
+                          <Select
+                            value={item.status}
+                            onValueChange={(value) => handleChangeProcessStatus(item, value as "blm" | "sdh diproses")}
+                          >
+                            <SelectTrigger className={`w-[140px] text-xs ${processStatusSelectClass(item.status)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="blm">blm</SelectItem>
+                              <SelectItem value="sdh diproses">sdh diproses</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
