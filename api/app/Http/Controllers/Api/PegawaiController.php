@@ -143,7 +143,7 @@ class PegawaiController extends Controller
             // Kepegawaian
             'statusPegawai' => ['required', 'string', 'max:20'],
             'jenisPegawai' => ['required', 'string', 'max:50'],
-            'tmtCpns' => ['required', 'date', 'before_or_equal:today'],
+            'tmtCpns' => ['nullable', 'date', 'before_or_equal:today'],
             'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
             'masaKerjaTahun' => ['required', 'integer', 'min:0'],
             'masaKerjaBulan' => ['required', 'integer', 'min:0', 'max:11'],
@@ -194,7 +194,7 @@ class PegawaiController extends Controller
                 'nipKepegawaian' => $validated['nipPegawai'],
                 'statusPegawai' => $validated['statusPegawai'],
                 'jenisPegawai' => $validated['jenisPegawai'],
-                'tmtCpns' => $validated['tmtCpns'],
+                'tmtCpns' => $validated['tmtCpns'] ?? null,
                 'tmtPns' => $validated['tmtPns'] ?? null,
                 'masaKerjaTahun' => $validated['masaKerjaTahun'],
                 'masaKerjaBulan' => $validated['masaKerjaBulan'],

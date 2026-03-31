@@ -20,86 +20,36 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import {
+  agamaList,
+  calculateMasaKerja,
+  jenisKelaminList,
+  jenisPegawaiList,
+  MAX_FOTO_SIZE_BYTES,
+  maximumBirthDateString,
+  statusKepegawaianList,
+  todayString,
+} from "@/lib/pegawai-form-shared"
+import {
+  applyBirthDateValidation,
+  applyDateNotAfterTodayValidation,
+  applyEmailValidation,
+  applyMasaKerjaValidation,
+  applyMaxLengthValidation,
+  applyNikValidation,
+  buildDuplicateErrors,
+  editPegawaiFieldLabels,
+  editPegawaiMaxLengthRules,
+  findPegawaiDuplicates,
+  normalizePegawaiFieldErrors,
+} from "@/lib/pegawai-form-validation"
+import { buildEditPegawaiPayload } from "@/lib/pegawai-form-payload"
+import { ensureIdentitasResmi, ensureKepegawaian, normalizePegawaiToEditForm } from "@/lib/pegawai-form-state"
 import type { IdentitasResmi, Kepegawaian, Pegawai } from "@/lib/types"
 import { departemenList, statusList, golonganList } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
-const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"]
-const jenisKelaminList = ["Laki-laki", "Perempuan"]
-const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
-const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
-const MAX_FOTO_SIZE_BYTES = 5 * 1024 * 1024
-
 type FormErrors = Record<string, string>
-
-const fieldLabels: Record<string, string> = {
-  nama: "Nama",
-  jabatan: "Jabatan",
-  departemen: "Departemen",
-  golongan: "Golongan",
-  status: "Status",
-  tanggalMasuk: "Tanggal masuk",
-  tempatLahir: "Tempat lahir",
-  tanggalLahir: "Tanggal lahir",
-  jenisKelamin: "Jenis kelamin",
-  agama: "Agama",
-  alamat: "Alamat",
-  noHp: "No. HP",
-  email: "Email",
-  "identitasResmi.nik": "NIK",
-  "identitasResmi.noBpjs": "No. BPJS",
-  "identitasResmi.noNpwp": "No. NPWP",
-  "identitasResmi.karpeg": "Karpeg",
-  "identitasResmi.karsuKarsi": "Karsu/Karsi",
-  "identitasResmi.taspen": "Taspen",
-  "kepegawaian.statusPegawai": "Status pegawai",
-  "kepegawaian.jenisPegawai": "Jenis pegawai",
-  "kepegawaian.tmtCpns": "TMT CPNS",
-  "kepegawaian.tmtPns": "TMT PNS",
-  "kepegawaian.masaKerjaTahun": "Masa kerja (tahun)",
-  "kepegawaian.masaKerjaBulan": "Masa kerja (bulan)",
-}
-
-const maxLengthRules: Record<string, number> = {
-  nama: 150,
-  jabatan: 150,
-  departemen: 150,
-  golongan: 100,
-  status: 20,
-  tempatLahir: 100,
-  jenisKelamin: 10,
-  agama: 20,
-  email: 120,
-  noHp: 20,
-  "identitasResmi.nik": 16,
-  "identitasResmi.noBpjs": 20,
-  "identitasResmi.noNpwp": 25,
-  "identitasResmi.karpeg": 30,
-  "identitasResmi.karsuKarsi": 30,
-  "identitasResmi.taspen": 30,
-  "kepegawaian.statusPegawai": 20,
-  "kepegawaian.jenisPegawai": 50,
-}
-
-const ensureIdentitasResmi = (pegawai: Pegawai, current?: Partial<IdentitasResmi>): IdentitasResmi => ({
-  nipIdResmi: current?.nipIdResmi ?? pegawai.identitasResmi?.nipIdResmi ?? pegawai.nipPegawai,
-  nik: current?.nik ?? "",
-  noBpjs: current?.noBpjs ?? "",
-  noNpwp: current?.noNpwp ?? "",
-  karpeg: current?.karpeg ?? "",
-  karsuKarsi: current?.karsuKarsi ?? "",
-  taspen: current?.taspen ?? "",
-})
-
-const ensureKepegawaian = (pegawai: Pegawai, current?: Partial<Kepegawaian>): Kepegawaian => ({
-  nipKepegawaian: current?.nipKepegawaian ?? pegawai.kepegawaian?.nipKepegawaian ?? pegawai.nipPegawai,
-  statusPegawai: current?.statusPegawai ?? pegawai.kepegawaian?.statusPegawai ?? pegawai.status ?? "",
-  jenisPegawai: current?.jenisPegawai ?? pegawai.kepegawaian?.jenisPegawai ?? pegawai.departemen ?? "",
-  tmtCpns: current?.tmtCpns ?? pegawai.kepegawaian?.tmtCpns ?? pegawai.tanggalMasuk ?? "",
-  tmtPns: current?.tmtPns ?? pegawai.kepegawaian?.tmtPns ?? "",
-  masaKerjaTahun: current?.masaKerjaTahun ?? pegawai.kepegawaian?.masaKerjaTahun ?? 0,
-  masaKerjaBulan: current?.masaKerjaBulan ?? pegawai.kepegawaian?.masaKerjaBulan ?? 0,
-})
 
 interface EditEmployeeModalProps {
   pegawai: Pegawai | null
@@ -121,16 +71,11 @@ export function EditEmployeeModal({
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
+  const calculatedMasaKerja = calculateMasaKerja(formData.kepegawaian?.tmtCpns)
 
   useEffect(() => {
     if (pegawai) {
-      setFormData({
-        ...pegawai,
-        status: pegawai.status ?? pegawai.kepegawaian?.statusPegawai ?? "",
-        departemen: pegawai.departemen ?? pegawai.kepegawaian?.jenisPegawai ?? "",
-        identitasResmi: ensureIdentitasResmi(pegawai, pegawai.identitasResmi),
-        kepegawaian: ensureKepegawaian(pegawai, pegawai.kepegawaian),
-      })
+      setFormData(normalizePegawaiToEditForm(pegawai))
       setFotoFile(null)
       setFieldErrors({})
     }
@@ -166,9 +111,21 @@ export function EditEmployeeModal({
   const updateKepegawaianField = (key: keyof Kepegawaian, value: Kepegawaian[keyof Kepegawaian]) => {
     setFormData((prev) => ({
       ...prev,
-      kepegawaian: ensureKepegawaian(pegawai!, { ...prev.kepegawaian, [key]: value }),
+      kepegawaian:
+        key === "tmtCpns"
+          ? ensureKepegawaian(pegawai!, {
+              ...prev.kepegawaian,
+              tmtCpns: value as string,
+              masaKerjaTahun: calculateMasaKerja((value as string) || "").tahun,
+              masaKerjaBulan: calculateMasaKerja((value as string) || "").bulan,
+            })
+          : ensureKepegawaian(pegawai!, { ...prev.kepegawaian, [key]: value }),
     }))
     clearFieldError(`kepegawaian.${String(key)}`)
+    if (key === "tmtCpns") {
+      clearFieldError("kepegawaian.masaKerjaTahun")
+      clearFieldError("kepegawaian.masaKerjaBulan")
+    }
   }
 
   const getFieldError = (path: string) => fieldErrors[path]
@@ -206,7 +163,6 @@ export function EditEmployeeModal({
       "identitasResmi.nik",
       "kepegawaian.statusPegawai",
       "kepegawaian.jenisPegawai",
-      "kepegawaian.tmtCpns",
     ]
 
     const nextErrors: FormErrors = {}
@@ -223,39 +179,20 @@ export function EditEmployeeModal({
       })
     }
 
-    Object.entries(maxLengthRules).forEach(([path, maxLength]) => {
-      const value = `${getVal(path) ?? ""}`.trim()
-      if (!value) return
-      if (value.length > maxLength) {
-        nextErrors[path] = `${fieldLabels[path] ?? path} maksimal ${maxLength} karakter.`
-      }
-    })
-
-    const email = `${formData.email ?? ""}`.trim()
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      nextErrors.email = "Format email tidak valid."
-    }
-
-    const nik = `${formData.identitasResmi?.nik ?? ""}`.trim()
-    if (nik && !/^\d{16}$/.test(nik)) {
-      nextErrors["identitasResmi.nik"] = "NIK harus terdiri dari 16 digit."
-    }
-
-    const tahun = formData.kepegawaian?.masaKerjaTahun
-    if (tahun !== undefined && `${tahun}` !== "") {
-      const tahunNum = Number(tahun)
-      if (!Number.isInteger(tahunNum) || tahunNum < 0) {
-        nextErrors["kepegawaian.masaKerjaTahun"] = "Masa kerja tahun harus bilangan bulat 0 atau lebih."
-      }
-    }
-
-    const bulan = formData.kepegawaian?.masaKerjaBulan
-    if (bulan !== undefined && `${bulan}` !== "") {
-      const bulanNum = Number(bulan)
-      if (!Number.isInteger(bulanNum) || bulanNum < 0 || bulanNum > 11) {
-        nextErrors["kepegawaian.masaKerjaBulan"] = "Masa kerja bulan harus antara 0 sampai 11."
-      }
-    }
+    applyMaxLengthValidation(nextErrors, (path) => `${getVal(path) ?? ""}`, editPegawaiMaxLengthRules, editPegawaiFieldLabels)
+    applyEmailValidation(nextErrors, "email", `${formData.email ?? ""}`.trim())
+    applyNikValidation(nextErrors, "identitasResmi.nik", `${formData.identitasResmi?.nik ?? ""}`.trim())
+    applyDateNotAfterTodayValidation(nextErrors, "tanggalMasuk", "Tanggal masuk", `${formData.tanggalMasuk ?? ""}`.trim())
+    applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtCpns", "TMT CPNS", `${formData.kepegawaian?.tmtCpns ?? ""}`.trim())
+    applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtPns", "TMT PNS", `${formData.kepegawaian?.tmtPns ?? ""}`.trim())
+    applyBirthDateValidation(nextErrors, "tanggalLahir", `${formData.tanggalLahir ?? ""}`.trim())
+    applyMasaKerjaValidation(
+      nextErrors,
+      "kepegawaian.masaKerjaTahun",
+      "kepegawaian.masaKerjaBulan",
+      calculatedMasaKerja.tahun,
+      calculatedMasaKerja.bulan
+    )
 
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors)
@@ -268,44 +205,33 @@ export function EditEmployeeModal({
     }
 
     // Uniqueness validation (exclude current pegawai)
-    const duplicates: string[] = []
-    const normalizedEmail = formData.email?.trim().toLowerCase()
-
-    existingPegawai
-      .filter((p) => p.nipPegawai !== pegawai.nipPegawai)
-      .forEach((p) => {
-        const ident = p.identitasResmi
-        if (normalizedEmail && p.email && p.email.toLowerCase() === normalizedEmail) duplicates.push("Email")
-        if (ident) {
-          if (formData.identitasResmi?.nik && ident.nik === formData.identitasResmi.nik) duplicates.push("NIK")
-          if (formData.identitasResmi?.noBpjs && ident.noBpjs === formData.identitasResmi.noBpjs) duplicates.push("No. BPJS")
-          if (formData.identitasResmi?.noNpwp && ident.noNpwp === formData.identitasResmi.noNpwp) duplicates.push("No. NPWP")
-          if (formData.identitasResmi?.karpeg && ident.karpeg === formData.identitasResmi.karpeg) duplicates.push("Karpeg")
-          if (formData.identitasResmi?.karsuKarsi && ident.karsuKarsi === formData.identitasResmi.karsuKarsi) duplicates.push("Karsu/Karsi")
-          if (formData.identitasResmi?.taspen && ident.taspen === formData.identitasResmi.taspen) duplicates.push("Taspen")
-        }
-      })
+    const duplicates = findPegawaiDuplicates(
+      existingPegawai,
+      {
+        email: formData.email,
+        nik: formData.identitasResmi?.nik,
+        noBpjs: formData.identitasResmi?.noBpjs,
+        noNpwp: formData.identitasResmi?.noNpwp,
+        karpeg: formData.identitasResmi?.karpeg,
+        karsuKarsi: formData.identitasResmi?.karsuKarsi,
+        taspen: formData.identitasResmi?.taspen,
+      },
+      { excludeNipPegawai: pegawai.nipPegawai }
+    )
 
     if (duplicates.length > 0) {
-      const uniq = Array.from(new Set(duplicates))
-      const duplicateFieldMap: Record<string, string> = {
-        Email: "email",
-        NIK: "identitasResmi.nik",
-        "No. BPJS": "identitasResmi.noBpjs",
-        "No. NPWP": "identitasResmi.noNpwp",
-        Karpeg: "identitasResmi.karpeg",
-        "Karsu/Karsi": "identitasResmi.karsuKarsi",
-        Taspen: "identitasResmi.taspen",
-      }
-      const duplicateErrors = uniq.reduce<FormErrors>((acc, label) => {
-        const key = duplicateFieldMap[label]
-        if (key) acc[key] = `${label} sudah digunakan.`
-        return acc
-      }, {})
+      const duplicateErrors = buildDuplicateErrors(duplicates, {
+        nik: "identitasResmi",
+        noBpjs: "identitasResmi",
+        noNpwp: "identitasResmi",
+        karpeg: "identitasResmi",
+        karsuKarsi: "identitasResmi",
+        taspen: "identitasResmi",
+      }) as FormErrors
       setFieldErrors(duplicateErrors)
       toast({
         title: "Kode sudah digunakan",
-        description: `Kolom ${uniq.join(", ")} tidak boleh sama dengan pegawai lain.`,
+        description: `Kolom ${duplicates.join(", ")} tidak boleh sama dengan pegawai lain.`,
         variant: "destructive",
       })
       return
@@ -319,6 +245,8 @@ export function EditEmployeeModal({
     const mergedKepegawaian = {
       ...ensureKepegawaian(pegawai, pegawai.kepegawaian),
       ...formData.kepegawaian,
+      masaKerjaTahun: calculatedMasaKerja.tahun,
+      masaKerjaBulan: calculatedMasaKerja.bulan,
     }
 
     if (mergedKepegawaian.masaKerjaTahun !== undefined) {
@@ -328,12 +256,12 @@ export function EditEmployeeModal({
       mergedKepegawaian.masaKerjaBulan = Number(mergedKepegawaian.masaKerjaBulan)
     }
 
-    const payload: Pegawai = {
-      ...pegawai,
-      ...formData,
+    const payload: Pegawai = buildEditPegawaiPayload({
+      pegawai,
+      formData,
       identitasResmi: mergedIdentitas,
       kepegawaian: mergedKepegawaian,
-    } as Pegawai
+    })
 
     setSaving(true)
     setFieldErrors({})
@@ -346,17 +274,7 @@ export function EditEmployeeModal({
       onClose()
     } catch (err: any) {
       if (err?.fieldErrors && typeof err.fieldErrors === "object") {
-        const mapped = Object.fromEntries(
-          Object.entries(err.fieldErrors).map(([key, value]) => {
-            const normalizedKey = ["nik", "noBpjs", "noNpwp", "karpeg", "karsuKarsi", "taspen"].includes(key)
-              ? `identitasResmi.${key}`
-              : ["statusPegawai", "jenisPegawai", "tmtCpns", "tmtPns", "masaKerjaTahun", "masaKerjaBulan"].includes(key)
-                ? `kepegawaian.${key}`
-                : key
-            return [normalizedKey, String(value)]
-          })
-        )
-        setFieldErrors(mapped)
+        setFieldErrors(normalizePegawaiFieldErrors(err.fieldErrors, "nested"))
       }
       toast({
         title: "Gagal menyimpan perubahan",
@@ -539,6 +457,7 @@ export function EditEmployeeModal({
               <Input
                 id="tanggalLahir"
                 type="date"
+                max={maximumBirthDateString}
                 value={formData.tanggalLahir || ""}
                 onChange={(e) => updateRootField("tanggalLahir", e.target.value)}
                 aria-invalid={Boolean(getFieldError("tanggalLahir"))}
@@ -641,6 +560,7 @@ export function EditEmployeeModal({
               <Input
                 id="tanggalMasuk"
                 type="date"
+                max={todayString}
                 value={formData.tanggalMasuk || ""}
                 onChange={(e) => updateRootField("tanggalMasuk", e.target.value)}
                 aria-invalid={Boolean(getFieldError("tanggalMasuk"))}
@@ -763,8 +683,8 @@ export function EditEmployeeModal({
 
           {/* Data Kepegawaian */}
           <h3 className="text-base font-semibold text-foreground border-b border-border pb-2 pt-2">Data Kepegawaian</h3>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-12">
+            <div className="space-y-2 xl:col-span-2">
               <Label htmlFor="statusPegawai" className="text-sm text-foreground">
                 Status Pegawai <span className="text-destructive">*</span>
               </Label>
@@ -788,7 +708,7 @@ export function EditEmployeeModal({
               </Select>
               {renderFieldError("kepegawaian.statusPegawai")}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 xl:col-span-2">
               <Label htmlFor="jenisPegawai" className="text-sm text-foreground">
                 Jenis Pegawai <span className="text-destructive">*</span>
               </Label>
@@ -812,13 +732,14 @@ export function EditEmployeeModal({
               </Select>
               {renderFieldError("kepegawaian.jenisPegawai")}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 xl:col-span-4">
               <Label htmlFor="tmtCpns" className="text-sm text-foreground">
-                TMT CPNS <span className="text-destructive">*</span>
+                TMT CPNS
               </Label>
               <Input
                 id="tmtCpns"
                 type="date"
+                max={todayString}
                 value={formData.kepegawaian?.tmtCpns || ""}
                 onChange={(e) => updateKepegawaianField("tmtCpns", e.target.value)}
                 aria-invalid={Boolean(getFieldError("kepegawaian.tmtCpns"))}
@@ -826,49 +747,20 @@ export function EditEmployeeModal({
               />
               {renderFieldError("kepegawaian.tmtCpns")}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 xl:col-span-4">
               <Label htmlFor="tmtPns" className="text-sm text-foreground">
                 TMT PNS
               </Label>
               <Input
                 id="tmtPns"
                 type="date"
+                max={todayString}
                 value={formData.kepegawaian?.tmtPns || ""}
                 onChange={(e) => updateKepegawaianField("tmtPns", e.target.value)}
                 aria-invalid={Boolean(getFieldError("kepegawaian.tmtPns"))}
                 className={getInputClassName("kepegawaian.tmtPns")}
               />
               {renderFieldError("kepegawaian.tmtPns")}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="masaKerjaTahun" className="text-sm text-foreground">
-                Masa Kerja (Tahun)
-              </Label>
-              <Input
-                id="masaKerjaTahun"
-                type="number"
-                min="0"
-                value={formData.kepegawaian?.masaKerjaTahun ?? ""}
-                onChange={(e) => updateKepegawaianField("masaKerjaTahun", e.target.value === "" ? 0 : Number(e.target.value))}
-                aria-invalid={Boolean(getFieldError("kepegawaian.masaKerjaTahun"))}
-                className={getInputClassName("kepegawaian.masaKerjaTahun")}
-              />
-              {renderFieldError("kepegawaian.masaKerjaTahun")}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="masaKerjaBulan" className="text-sm text-foreground">
-                Masa Kerja (Bulan)
-              </Label>
-              <Input
-                id="masaKerjaBulan"
-                type="number"
-                min="0"
-                value={formData.kepegawaian?.masaKerjaBulan ?? ""}
-                onChange={(e) => updateKepegawaianField("masaKerjaBulan", e.target.value === "" ? 0 : Number(e.target.value))}
-                aria-invalid={Boolean(getFieldError("kepegawaian.masaKerjaBulan"))}
-                className={getInputClassName("kepegawaian.masaKerjaBulan")}
-              />
-              {renderFieldError("kepegawaian.masaKerjaBulan")}
             </div>
           </div>
 
