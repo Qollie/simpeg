@@ -163,6 +163,7 @@ export function EditEmployeeModal({
       "identitasResmi.nik",
       "kepegawaian.statusPegawai",
       "kepegawaian.jenisPegawai",
+      "kepegawaian.tmtPns",
     ]
 
     const nextErrors: FormErrors = {}
@@ -749,7 +750,7 @@ export function EditEmployeeModal({
             </div>
             <div className="space-y-2">
               <Label htmlFor="tmtPns" className="text-sm text-foreground">
-                TMT PNS
+                TMT PNS <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="tmtPns"

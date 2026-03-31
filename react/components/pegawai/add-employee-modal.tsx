@@ -162,6 +162,7 @@ export function AddEmployeeModal({
       "jenisPegawai",
       "tanggalMasuk",
       "agama",
+      "tmtPns",
       "masaKerjaTahun",
       "masaKerjaBulan",
     ]
@@ -808,7 +809,7 @@ export function AddEmployeeModal({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tmtPns" className="text-sm">
-                  TMT PNS
+                  TMT PNS <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="tmtPns"
