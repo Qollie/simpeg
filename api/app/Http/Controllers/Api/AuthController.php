@@ -16,10 +16,18 @@ class AuthController extends Controller
         $validated = $request->validate([
             'username' => ['required', 'string'],
             'password' => ['required', 'string'],
-            'turnstile_token' => ['required', 'string'],
+            'turnstile_token' => ['nullable', 'string'],
         ]);
 
-        if (!$this->verifyTurnstile($validated['turnstile_token'], $request->ip())) {
+        $requiresTurnstile = $this->shouldEnforceTurnstile();
+
+        if ($requiresTurnstile && empty($validated['turnstile_token'])) {
+            return response()->json([
+                'message' => 'The turnstile token field is required.',
+            ], 422);
+        }
+
+        if ($requiresTurnstile && !$this->verifyTurnstile((string) $validated['turnstile_token'], $request->ip())) {
             return response()->json([
                 'message' => 'Verifikasi captcha gagal. Silakan coba lagi.',
             ], 422);
@@ -97,5 +105,14 @@ class AuthController extends Controller
         $data = $response->json();
 
         return (bool) ($data['success'] ?? false);
+    }
+
+    private function shouldEnforceTurnstile(): bool
+    {
+        if (app()->environment(['local', 'testing'])) {
+            return false;
+        }
+
+        return filled(config('services.turnstile.secret'));
     }
 }
