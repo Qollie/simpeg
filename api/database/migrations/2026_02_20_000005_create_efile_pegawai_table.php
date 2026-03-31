@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('EfilePegawai')) {
+            return;
+        }
+
         Schema::create('EfilePegawai', function (Blueprint $table) {
             $table->increments('idFile');
             $table->char('nipEfile', 18);

@@ -28,8 +28,9 @@ export const addPegawaiFieldLabels: Record<string, string> = {
   jenisPegawai: "Jenis pegawai",
   tmtCpns: "TMT CPNS",
   tmtPns: "TMT PNS",
-  masaKerjaTahun: "Masa kerja (tahun)",
-  masaKerjaBulan: "Masa kerja (bulan)",
+  tmtPppk: "TMT PPPK",
+  masaKerjaTahun: "Lama kerja (tahun)",
+  masaKerjaBulan: "Lama kerja (bulan)",
 }
 
 export const editPegawaiFieldLabels: Record<string, string> = {
@@ -56,8 +57,9 @@ export const editPegawaiFieldLabels: Record<string, string> = {
   "kepegawaian.jenisPegawai": "Jenis pegawai",
   "kepegawaian.tmtCpns": "TMT CPNS",
   "kepegawaian.tmtPns": "TMT PNS",
-  "kepegawaian.masaKerjaTahun": "Masa kerja (tahun)",
-  "kepegawaian.masaKerjaBulan": "Masa kerja (bulan)",
+  "kepegawaian.tmtPppk": "TMT PPPK",
+  "kepegawaian.masaKerjaTahun": "Lama kerja (tahun)",
+  "kepegawaian.masaKerjaBulan": "Lama kerja (bulan)",
 }
 
 export const addPegawaiMaxLengthRules: Record<string, number> = {
@@ -160,11 +162,11 @@ export const applyMasaKerjaValidation = (
   bulan: number
 ) => {
   if (!Number.isInteger(tahun) || tahun < 0) {
-    errors[tahunKey] = "Masa kerja tahun harus bilangan bulat 0 atau lebih."
+    errors[tahunKey] = "Lama kerja tahun harus bilangan bulat 0 atau lebih."
   }
 
   if (!Number.isInteger(bulan) || bulan < 0 || bulan > 11) {
-    errors[bulanKey] = "Masa kerja bulan harus antara 0 sampai 11."
+    errors[bulanKey] = "Lama kerja bulan harus antara 0 sampai 11."
   }
 }
 
@@ -237,7 +239,7 @@ export const buildDuplicateErrors = (
 }
 
 const identitasResmiKeys = ["nik", "noBpjs", "noNpwp", "karpeg", "karsuKarsi", "taspen"]
-const kepegawaianKeys = ["statusPegawai", "jenisPegawai", "tmtCpns", "tmtPns", "masaKerjaTahun", "masaKerjaBulan"]
+const kepegawaianKeys = ["statusPegawai", "jenisPegawai", "tmtCpns", "tmtPns", "tmtPppk", "masaKerjaTahun", "masaKerjaBulan"]
 
 export const normalizePegawaiFieldErrors = (
   fieldErrors: Record<string, unknown>,

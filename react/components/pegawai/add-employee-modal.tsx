@@ -22,11 +22,12 @@ import { useToast } from "@/hooks/use-toast"
 import {
   agamaList,
   calculateMasaKerja,
+  jenisPegawaiOptions,
   jenisKelaminList,
-  jenisPegawaiList,
   MAX_FOTO_SIZE_BYTES,
   maximumBirthDateString,
-  statusKepegawaianList,
+  statusKepegawaianLabelFromValue,
+  statusKepegawaianOptions,
   todayString,
 } from "@/lib/pegawai-form-shared"
 import {
@@ -73,7 +74,9 @@ export function AddEmployeeModal({
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
-  const calculatedMasaKerja = calculateMasaKerja(formData.tmtPns)
+  const selectedStatusPegawai = statusKepegawaianLabelFromValue(formData.statusPegawai)
+  const masaKerjaSourceDate = selectedStatusPegawai === "PPPK" ? formData.tmtPppk : formData.tmtPns
+  const calculatedMasaKerja = calculateMasaKerja(masaKerjaSourceDate)
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -104,7 +107,25 @@ export function AddEmployeeModal({
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    setFormData((prev) => {
+      if (name === "statusPegawai") {
+        const status = statusKepegawaianLabelFromValue(value)
+
+        if (status === "PNS") {
+          return { ...prev, statusPegawai: value, tmtPppk: "" }
+        }
+
+        if (status === "PPPK") {
+          return { ...prev, statusPegawai: value, tmtCpns: "", tmtPns: "" }
+        }
+
+        if (status === "Non-ASN") {
+          return { ...prev, statusPegawai: value, tmtCpns: "", tmtPns: "", tmtPppk: "" }
+        }
+      }
+
+      return { ...prev, [name]: value }
+    })
     setFieldErrors((prev) => {
       if (!(name in prev)) return prev
       const next = { ...prev }
@@ -162,10 +183,17 @@ export function AddEmployeeModal({
       "jenisPegawai",
       "tanggalMasuk",
       "agama",
-      "tmtPns",
       "masaKerjaTahun",
       "masaKerjaBulan",
     ]
+
+    if (selectedStatusPegawai === "PNS") {
+      requiredFields.push("tmtPns")
+    }
+
+    if (selectedStatusPegawai === "PPPK") {
+      requiredFields.push("tmtPppk")
+    }
 
     const nextErrors: FormErrors = {}
 
@@ -194,6 +222,7 @@ export function AddEmployeeModal({
     applyDateNotAfterTodayValidation(nextErrors, "tanggalMasuk", "Tanggal masuk", formData.tanggalMasuk.trim())
     applyDateNotAfterTodayValidation(nextErrors, "tmtCpns", "TMT CPNS", formData.tmtCpns.trim())
     applyDateNotAfterTodayValidation(nextErrors, "tmtPns", "TMT PNS", formData.tmtPns.trim())
+    applyDateNotAfterTodayValidation(nextErrors, "tmtPppk", "TMT PPPK", formData.tmtPppk.trim())
     applyBirthDateValidation(nextErrors, "tanggalLahir", formData.tanggalLahir.trim())
     applyMasaKerjaValidation(nextErrors, "masaKerjaTahun", "masaKerjaBulan", calculatedMasaKerja.tahun, calculatedMasaKerja.bulan)
 
@@ -758,9 +787,9 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {statusKepegawaianList.map((statusItem) => (
-                      <SelectItem key={statusItem} value={statusItem}>
-                        {statusItem}
+                    {statusKepegawaianOptions.map((statusItem) => (
+                      <SelectItem key={statusItem.value} value={statusItem.value}>
+                        {statusItem.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -782,47 +811,69 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih jenis pegawai" />
                   </SelectTrigger>
                   <SelectContent>
-                    {jenisPegawaiList.map((jenis) => (
-                      <SelectItem key={jenis} value={jenis}>
-                        {jenis}
+                    {jenisPegawaiOptions.map((jenis) => (
+                      <SelectItem key={jenis.value} value={jenis.value}>
+                        {jenis.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {renderFieldError("jenisPegawai")}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="tmtCpns" className="text-sm">
-                  TMT CPNS
-                </Label>
-                <Input
-                  id="tmtCpns"
-                  name="tmtCpns"
-                  type="date"
-                  max={todayString}
-                  value={formData.tmtCpns}
-                  onChange={handleInputChange}
-                  aria-invalid={Boolean(getFieldError("tmtCpns"))}
-                  className={getInputClassName("tmtCpns")}
-                />
-                {renderFieldError("tmtCpns")}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tmtPns" className="text-sm">
-                  TMT PNS <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="tmtPns"
-                  name="tmtPns"
-                  type="date"
-                  max={todayString}
-                  value={formData.tmtPns}
-                  onChange={handleInputChange}
-                  aria-invalid={Boolean(getFieldError("tmtPns"))}
-                  className={getInputClassName("tmtPns")}
-                />
-                {renderFieldError("tmtPns")}
-              </div>
+              {selectedStatusPegawai === "PNS" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="tmtCpns" className="text-sm">
+                      TMT CPNS
+                    </Label>
+                    <Input
+                      id="tmtCpns"
+                      name="tmtCpns"
+                      type="date"
+                      max={todayString}
+                      value={formData.tmtCpns}
+                      onChange={handleInputChange}
+                      aria-invalid={Boolean(getFieldError("tmtCpns"))}
+                      className={getInputClassName("tmtCpns")}
+                    />
+                    {renderFieldError("tmtCpns")}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tmtPns" className="text-sm">
+                      TMT PNS <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="tmtPns"
+                      name="tmtPns"
+                      type="date"
+                      max={todayString}
+                      value={formData.tmtPns}
+                      onChange={handleInputChange}
+                      aria-invalid={Boolean(getFieldError("tmtPns"))}
+                      className={getInputClassName("tmtPns")}
+                    />
+                    {renderFieldError("tmtPns")}
+                  </div>
+                </>
+              )}
+              {selectedStatusPegawai === "PPPK" && (
+                <div className="space-y-2">
+                  <Label htmlFor="tmtPppk" className="text-sm">
+                    TMT PPPK <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="tmtPppk"
+                    name="tmtPppk"
+                    type="date"
+                    max={todayString}
+                    value={formData.tmtPppk}
+                    onChange={handleInputChange}
+                    aria-invalid={Boolean(getFieldError("tmtPppk"))}
+                    className={getInputClassName("tmtPppk")}
+                  />
+                  {renderFieldError("tmtPppk")}
+                </div>
+              )}
             </div>
           </div>
 

@@ -29,6 +29,8 @@ Route::prefix('api')->withoutMiddleware([ValidateCsrfToken::class])->group(funct
         Route::get('karir/satyalancana', [CareerController::class, 'satyalancana']);
         Route::get('karir/satyalancana/export', [CareerController::class, 'exportSatyalancanaCsv']);
         Route::get('karir/summary', [CareerController::class, 'summary']);
+        Route::get('karir/status-proses', [CareerController::class, 'processStatuses']);
+        Route::patch('karir/status-proses/{nip}', [CareerController::class, 'updateProcessStatus']);
         Route::post('pegawai/{id}', [PegawaiController::class, 'update']);
         Route::put('pegawai/{id}', [PegawaiController::class, 'update']);
         Route::delete('pegawai/{id}', [PegawaiController::class, 'destroy']);

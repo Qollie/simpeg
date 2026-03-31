@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('RiwayatPangkat')) {
+            return;
+        }
+
         Schema::create('RiwayatPangkat', function (Blueprint $table) {
             $table->increments('idRiwayat');
             $table->char('nipRiwayat', 18);

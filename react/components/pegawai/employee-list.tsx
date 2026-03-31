@@ -55,7 +55,7 @@ export function EmployeeList({
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="text-muted-foreground w-[400px]">Data Pegawai</TableHead>
               <TableHead className="text-muted-foreground">Golongan</TableHead>
-              <TableHead className="text-muted-foreground">Status & Masa Kerja</TableHead>
+              <TableHead className="text-muted-foreground">Status & Lama Kerja</TableHead>
               <TableHead className="text-center text-muted-foreground"> Aksi</TableHead>
             </TableRow>
           </TableHeader>

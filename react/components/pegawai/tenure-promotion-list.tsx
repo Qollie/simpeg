@@ -75,7 +75,7 @@ export function TenurePromotionList({ data }: TenurePromotionListProps) {
           </div>
           <div>
             <CardTitle className="text-lg font-semibold">Pegawai Senior (10-20 Tahun)</CardTitle>
-            <CardDescription>Daftar pegawai dengan masa pengabdian antara 10 hingga 20 tahun yang layak naik pangkat.</CardDescription>
+            <CardDescription>Daftar pegawai dengan lama pengabdian antara 10 hingga 20 tahun yang layak naik pangkat.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -85,7 +85,7 @@ export function TenurePromotionList({ data }: TenurePromotionListProps) {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent bg-secondary/30">
                 <TableHead className="text-muted-foreground">Pegawai</TableHead>
-                <TableHead className="text-muted-foreground">Masa Kerja</TableHead>
+                <TableHead className="text-muted-foreground">Lama Kerja</TableHead>
                 <TableHead className="text-muted-foreground">Golongan</TableHead>
                 <TableHead className="text-muted-foreground">Target</TableHead>
                 <TableHead className="text-center text-muted-foreground">Status</TableHead>

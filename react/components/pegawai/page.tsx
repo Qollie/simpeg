@@ -12,7 +12,6 @@ import {
 import { ModalLihatPegawai } from "@/components/pegawai/view-employee-modal"
 import type { Pegawai } from "@/lib/types"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import {
   Select,
   SelectContent,
@@ -20,12 +19,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Download } from "lucide-react"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 const DEFAULT_PAGINATION: PaginationMeta = {
   currentPage: 1,
   lastPage: 1,
   total: 0,
+}
+
+type KarirProcessStatusItem = {
+  id: number
+  nipPegawai: string
+  nama: string
+  status: "blm" | "sdh diproses"
 }
 
 // Normalize status coming from various API fields/casing
@@ -92,6 +105,8 @@ export default function KarirPage() {
 
   const [promotionPagination, setPromotionPagination] = useState<PaginationMeta>(DEFAULT_PAGINATION)
   const [satyaPagination, setSatyaPagination] = useState<PaginationMeta>(DEFAULT_PAGINATION)
+  const [processLoading, setProcessLoading] = useState(false)
+  const [processItems, setProcessItems] = useState<KarirProcessStatusItem[]>([])
   const [careerSummary, setCareerSummary] = useState({
     promotionTotal: 0,
     satyalancanaTotal: 0,
@@ -229,6 +244,34 @@ export default function KarirPage() {
 
   useEffect(() => {
     let mounted = true
+    const params = new URLSearchParams()
+    params.set("page", String(promotionPage))
+    params.set("per_page", perPage)
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+
+    setProcessLoading(true)
+
+    fetch(`/api/karir/status-proses?${params.toString()}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!mounted) return
+        setProcessItems(json.data ?? [])
+      })
+      .catch(() => {
+        if (!mounted) return
+        setProcessItems([])
+      })
+      .finally(() => {
+        if (mounted) setProcessLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [promotionPage, perPage, searchQuery])
+
+  useEffect(() => {
+    let mounted = true
 
     const params = new URLSearchParams()
     if (searchQuery.trim()) params.set("q", searchQuery.trim())
@@ -275,6 +318,27 @@ export default function KarirPage() {
   const summaryText = useMemo(() => {
     return `Naik pangkat: ${careerSummary.promotionTotal} pegawai | Satyalancana: ${careerSummary.satyalancanaTotal} pegawai`
   }, [careerSummary.promotionTotal, careerSummary.satyalancanaTotal])
+
+  const handleChangeProcessStatus = async (item: KarirProcessStatusItem, status: "blm" | "sdh diproses") => {
+    try {
+      const response = await fetch(`/api/karir/status-proses/${item.nipPegawai}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Gagal memperbarui status proses")
+      }
+
+      setProcessItems((prev) => prev.map((row) => (row.nipPegawai === item.nipPegawai ? { ...row, status } : row)))
+    } catch {
+      // Keep UI unchanged when request fails
+    }
+  }
 
   return (
     <AdminLayout title="Peningkatan Karir">
@@ -356,6 +420,61 @@ export default function KarirPage() {
             onPageChange={setSatyaPage}
             lihatDetail={handleLihatDetail}
           />
+        </div>
+
+        <div className="rounded-lg border border-border/60 bg-card p-3 md:p-4">
+          <p className="text-sm font-semibold">Status Proses Karir</p>
+          <p className="mt-1 text-xs text-muted-foreground">Pantau data sudah diproses atau belum berdasarkan ID.</p>
+
+          <div className="mt-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[110px]">ID</TableHead>
+                  <TableHead>NIP</TableHead>
+                  <TableHead>Nama</TableHead>
+                  <TableHead className="w-[180px]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {processLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-4">
+                      Memuat status proses...
+                    </TableCell>
+                  </TableRow>
+                ) : processItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-4">
+                      Data status proses belum tersedia.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  processItems.map((item) => (
+                    <TableRow key={item.nipPegawai}>
+                      <TableCell>{item.id}</TableCell>
+                      <TableCell>{item.nipPegawai}</TableCell>
+                      <TableCell>{item.nama}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={item.status}
+                          onValueChange={(value) => handleChangeProcessStatus(item, value as "blm" | "sdh diproses")}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="blm">blm</SelectItem>
+                            <SelectItem value="sdh diproses">sdh diproses</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 

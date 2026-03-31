@@ -1,5 +1,9 @@
 import type { IdentitasResmi, Kepegawaian, Pegawai } from "@/lib/types"
 import { calculateMasaKerja } from "@/lib/pegawai-form-shared"
+import {
+  jenisPegawaiValueFromValueOrLabel,
+  statusKepegawaianValueFromValueOrLabel,
+} from "@/lib/pegawai-form-shared"
 
 export type AddPegawaiFormState = {
   nipPegawai: string
@@ -28,6 +32,7 @@ export type AddPegawaiFormState = {
   jenisPegawai: string
   tmtCpns: string
   tmtPns: string
+  tmtPppk: string
   masaKerjaTahun: string
   masaKerjaBulan: string
 }
@@ -59,6 +64,7 @@ export const createInitialAddPegawaiForm = (): AddPegawaiFormState => ({
   jenisPegawai: "",
   tmtCpns: "",
   tmtPns: "",
+  tmtPppk: "",
   masaKerjaTahun: "0",
   masaKerjaBulan: "0",
 })
@@ -79,6 +85,7 @@ export const ensureKepegawaian = (pegawai: Pegawai, current?: Partial<Kepegawaia
   jenisPegawai: current?.jenisPegawai ?? pegawai.kepegawaian?.jenisPegawai ?? pegawai.departemen ?? "",
   tmtCpns: current?.tmtCpns ?? pegawai.kepegawaian?.tmtCpns ?? pegawai.tanggalMasuk ?? "",
   tmtPns: current?.tmtPns ?? pegawai.kepegawaian?.tmtPns ?? "",
+  tmtPppk: current?.tmtPppk ?? pegawai.kepegawaian?.tmtPppk ?? "",
   masaKerjaTahun: current?.masaKerjaTahun ?? pegawai.kepegawaian?.masaKerjaTahun ?? 0,
   masaKerjaBulan: current?.masaKerjaBulan ?? pegawai.kepegawaian?.masaKerjaBulan ?? 0,
 })
@@ -93,6 +100,8 @@ export const normalizePegawaiToEditForm = (pegawai: Pegawai): Partial<Pegawai> =
     identitasResmi: ensureIdentitasResmi(pegawai, pegawai.identitasResmi),
     kepegawaian: ensureKepegawaian(pegawai, {
       ...pegawai.kepegawaian,
+      statusPegawai: statusKepegawaianValueFromValueOrLabel(pegawai.kepegawaian?.statusPegawai),
+      jenisPegawai: jenisPegawaiValueFromValueOrLabel(pegawai.kepegawaian?.jenisPegawai),
       masaKerjaTahun: masaKerja.tahun,
       masaKerjaBulan: masaKerja.bulan,
     }),

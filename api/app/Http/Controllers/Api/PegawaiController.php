@@ -18,9 +18,49 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
+    private const STATUS_PEGAWAI_MAP = [
+        '1' => 'PNS',
+        '2' => 'PPPK',
+        '3' => 'Non-ASN',
+    ];
+
+    private const JENIS_PEGAWAI_MAP = [
+        '1' => 'Tenaga Struktural',
+        '2' => 'Tenaga Fungsional',
+        '3' => 'Tenaga Administrasi',
+    ];
+
     private function maximumBirthDate(): string
     {
         return Carbon::today()->subYears(17)->toDateString();
+    }
+
+    private function mapStatusPegawai(string $value): string
+    {
+        return self::STATUS_PEGAWAI_MAP[$value] ?? $value;
+    }
+
+    private function mapJenisPegawai(string $value): string
+    {
+        return self::JENIS_PEGAWAI_MAP[$value] ?? $value;
+    }
+
+    private function normalizeKepegawaianDates(array $validated): array
+    {
+        $statusPegawai = strtolower(trim((string) ($validated['statusPegawai'] ?? '')));
+
+        if ($statusPegawai === 'pppk') {
+            $validated['tmtCpns'] = null;
+            $validated['tmtPns'] = null;
+        }
+
+        if ($statusPegawai === 'non-asn') {
+            $validated['tmtCpns'] = null;
+            $validated['tmtPns'] = null;
+            $validated['tmtPppk'] = null;
+        }
+
+        return $validated;
     }
 
     public function index(Request $request)
@@ -144,10 +184,15 @@ class PegawaiController extends Controller
             'statusPegawai' => ['required', 'string', 'max:20'],
             'jenisPegawai' => ['required', 'string', 'max:50'],
             'tmtCpns' => ['nullable', 'date', 'before_or_equal:today'],
-            'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
+            'tmtPns' => ['nullable', 'date', 'before_or_equal:today', 'required_if:statusPegawai,1,PNS'],
+            'tmtPppk' => ['nullable', 'date', 'before_or_equal:today', 'required_if:statusPegawai,2,PPPK'],
             'masaKerjaTahun' => ['required', 'integer', 'min:0'],
             'masaKerjaBulan' => ['required', 'integer', 'min:0', 'max:11'],
         ]);
+
+        $validated['statusPegawai'] = $this->mapStatusPegawai((string) $validated['statusPegawai']);
+        $validated['jenisPegawai'] = $this->mapJenisPegawai((string) $validated['jenisPegawai']);
+        $validated = $this->normalizeKepegawaianDates($validated);
 
         $fotoPath = null;
         if ($request->hasFile('foto')) {
@@ -196,6 +241,7 @@ class PegawaiController extends Controller
                 'jenisPegawai' => $validated['jenisPegawai'],
                 'tmtCpns' => $validated['tmtCpns'] ?? null,
                 'tmtPns' => $validated['tmtPns'] ?? null,
+                'tmtPppk' => $validated['tmtPppk'] ?? null,
                 'masaKerjaTahun' => $validated['masaKerjaTahun'],
                 'masaKerjaBulan' => $validated['masaKerjaBulan'],
             ]);
@@ -245,9 +291,18 @@ class PegawaiController extends Controller
             'jenisPegawai' => ['nullable', 'string', 'max:50'],
             'tmtCpns' => ['nullable', 'date', 'before_or_equal:today'],
             'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
+            'tmtPppk' => ['nullable', 'date', 'before_or_equal:today'],
             'masaKerjaTahun' => ['nullable', 'integer', 'min:0'],
             'masaKerjaBulan' => ['nullable', 'integer', 'min:0', 'max:11'],
         ]);
+
+        if (array_key_exists('statusPegawai', $validated)) {
+            $validated['statusPegawai'] = $this->mapStatusPegawai((string) $validated['statusPegawai']);
+        }
+        if (array_key_exists('jenisPegawai', $validated)) {
+            $validated['jenisPegawai'] = $this->mapJenisPegawai((string) $validated['jenisPegawai']);
+        }
+        $validated = $this->normalizeKepegawaianDates($validated);
 
         if ($request->hasFile('foto')) {
             $stored = $request->file('foto')->storeAs(
@@ -280,7 +335,7 @@ class PegawaiController extends Controller
         }
 
         // Update kepegawaian (if any kepegawaian-related field provided)
-        if ($request->hasAny(['statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'masaKerjaTahun', 'masaKerjaBulan', 'departemen'])) {
+        if ($request->hasAny(['statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'tmtPppk', 'masaKerjaTahun', 'masaKerjaBulan', 'departemen'])) {
             $existing = Kepegawaian::where('nipKepegawaian', $id)->first();
 
             $kepegawaianPayload = [
@@ -288,9 +343,20 @@ class PegawaiController extends Controller
                 'jenisPegawai' => $request->input('jenisPegawai', $existing?->jenisPegawai ?? $request->input('departemen')),
                 'tmtCpns' => $request->input('tmtCpns', $existing?->tmtCpns),
                 'tmtPns' => $request->input('tmtPns', $existing?->tmtPns),
+                'tmtPppk' => $request->input('tmtPppk', $existing?->tmtPppk),
                 'masaKerjaTahun' => $request->input('masaKerjaTahun', $existing?->masaKerjaTahun ?? 0),
                 'masaKerjaBulan' => $request->input('masaKerjaBulan', $existing?->masaKerjaBulan ?? 0),
             ];
+
+            if (!empty($kepegawaianPayload['statusPegawai'])) {
+                $kepegawaianPayload['statusPegawai'] = $this->mapStatusPegawai((string) $kepegawaianPayload['statusPegawai']);
+            }
+
+            if (!empty($kepegawaianPayload['jenisPegawai'])) {
+                $kepegawaianPayload['jenisPegawai'] = $this->mapJenisPegawai((string) $kepegawaianPayload['jenisPegawai']);
+            }
+
+            $kepegawaianPayload = $this->normalizeKepegawaianDates($kepegawaianPayload);
 
             Kepegawaian::updateOrCreate(
                 ['nipKepegawaian' => $id],

@@ -121,7 +121,7 @@ export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageCha
               Layak Naik Pangkat
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Masa kerja golongan minimal 4 tahun dan syarat pendidikan terpenuhi
+              Lama kerja golongan minimal 4 tahun dan syarat pendidikan terpenuhi
             </CardDescription>
           </div>
           <Badge variant="secondary" className="h-fit">
@@ -199,7 +199,7 @@ export function SatyalancanaKaryaSatya({ items, pagination, loading, onPageChang
               Satyalancana Karya Satya
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Monitoring pegawai yang mendekati atau memenuhi masa kerja 10, 20, dan 30 tahun
+              Monitoring pegawai yang mendekati atau memenuhi lama kerja 10, 20, dan 30 tahun
             </CardDescription>
           </div>
           <Badge variant="secondary" className="h-fit bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">

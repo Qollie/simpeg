@@ -12,7 +12,7 @@ class Kepegawaian extends Model
     protected $keyType = 'string';
     public $timestamps = false;
 
-    protected $fillable = ['nipKepegawaian', 'statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'masaKerjaTahun', 'masaKerjaBulan'];
+    protected $fillable = ['nipKepegawaian', 'statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'tmtPppk', 'masaKerjaTahun', 'masaKerjaBulan'];
 
     public function pegawai()
     {

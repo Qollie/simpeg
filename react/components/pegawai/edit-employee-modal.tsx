@@ -23,11 +23,12 @@ import { useToast } from "@/hooks/use-toast"
 import {
   agamaList,
   calculateMasaKerja,
+  jenisPegawaiOptions,
   jenisKelaminList,
-  jenisPegawaiList,
   MAX_FOTO_SIZE_BYTES,
   maximumBirthDateString,
-  statusKepegawaianList,
+  statusKepegawaianLabelFromValue,
+  statusKepegawaianOptions,
   todayString,
 } from "@/lib/pegawai-form-shared"
 import {
@@ -71,7 +72,9 @@ export function EditEmployeeModal({
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
-  const calculatedMasaKerja = calculateMasaKerja(formData.kepegawaian?.tmtPns)
+  const selectedStatusPegawai = statusKepegawaianLabelFromValue(formData.kepegawaian?.statusPegawai)
+  const masaKerjaSourceDate = selectedStatusPegawai === "PPPK" ? formData.kepegawaian?.tmtPppk : formData.kepegawaian?.tmtPns
+  const calculatedMasaKerja = calculateMasaKerja(masaKerjaSourceDate)
 
   useEffect(() => {
     if (pegawai) {
@@ -112,17 +115,27 @@ export function EditEmployeeModal({
     setFormData((prev) => ({
       ...prev,
       kepegawaian:
-        key === "tmtPns"
+        key === "tmtPns" || key === "tmtPppk"
           ? ensureKepegawaian(pegawai!, {
               ...prev.kepegawaian,
-              tmtPns: value as string,
+              [key]: value,
               masaKerjaTahun: calculateMasaKerja((value as string) || "").tahun,
               masaKerjaBulan: calculateMasaKerja((value as string) || "").bulan,
             })
+          : key === "statusPegawai"
+            ? ensureKepegawaian(pegawai!, {
+                ...prev.kepegawaian,
+                statusPegawai: value as string,
+                ...(statusKepegawaianLabelFromValue(String(value)) === "PNS"
+                  ? { tmtPppk: "" }
+                  : statusKepegawaianLabelFromValue(String(value)) === "PPPK"
+                    ? { tmtCpns: "", tmtPns: "" }
+                    : { tmtCpns: "", tmtPns: "", tmtPppk: "" }),
+              })
           : ensureKepegawaian(pegawai!, { ...prev.kepegawaian, [key]: value }),
     }))
     clearFieldError(`kepegawaian.${String(key)}`)
-    if (key === "tmtPns") {
+    if (key === "tmtPns" || key === "tmtPppk") {
       clearFieldError("kepegawaian.masaKerjaTahun")
       clearFieldError("kepegawaian.masaKerjaBulan")
     }
@@ -163,8 +176,15 @@ export function EditEmployeeModal({
       "identitasResmi.nik",
       "kepegawaian.statusPegawai",
       "kepegawaian.jenisPegawai",
-      "kepegawaian.tmtPns",
     ]
+
+    if (selectedStatusPegawai === "PNS") {
+      requiredFields.push("kepegawaian.tmtPns")
+    }
+
+    if (selectedStatusPegawai === "PPPK") {
+      requiredFields.push("kepegawaian.tmtPppk")
+    }
 
     const nextErrors: FormErrors = {}
 
@@ -186,6 +206,7 @@ export function EditEmployeeModal({
     applyDateNotAfterTodayValidation(nextErrors, "tanggalMasuk", "Tanggal masuk", `${formData.tanggalMasuk ?? ""}`.trim())
     applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtCpns", "TMT CPNS", `${formData.kepegawaian?.tmtCpns ?? ""}`.trim())
     applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtPns", "TMT PNS", `${formData.kepegawaian?.tmtPns ?? ""}`.trim())
+    applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtPppk", "TMT PPPK", `${formData.kepegawaian?.tmtPppk ?? ""}`.trim())
     applyBirthDateValidation(nextErrors, "tanggalLahir", `${formData.tanggalLahir ?? ""}`.trim())
     applyMasaKerjaValidation(
       nextErrors,
@@ -700,9 +721,9 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih Status Pegawai" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statusKepegawaianList.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
+                  {statusKepegawaianOptions.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -724,45 +745,66 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih Jenis Pegawai" />
                 </SelectTrigger>
                 <SelectContent>
-                  {jenisPegawaiList.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
+                  {jenisPegawaiOptions.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {renderFieldError("kepegawaian.jenisPegawai")}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="tmtCpns" className="text-sm text-foreground">
-                TMT CPNS
-              </Label>
-              <Input
-                id="tmtCpns"
-                type="date"
-                max={todayString}
-                value={formData.kepegawaian?.tmtCpns || ""}
-                onChange={(e) => updateKepegawaianField("tmtCpns", e.target.value)}
-                aria-invalid={Boolean(getFieldError("kepegawaian.tmtCpns"))}
-                className={getInputClassName("kepegawaian.tmtCpns")}
-              />
-              {renderFieldError("kepegawaian.tmtCpns")}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tmtPns" className="text-sm text-foreground">
-                TMT PNS <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="tmtPns"
-                type="date"
-                max={todayString}
-                value={formData.kepegawaian?.tmtPns || ""}
-                onChange={(e) => updateKepegawaianField("tmtPns", e.target.value)}
-                aria-invalid={Boolean(getFieldError("kepegawaian.tmtPns"))}
-                className={getInputClassName("kepegawaian.tmtPns")}
-              />
-              {renderFieldError("kepegawaian.tmtPns")}
-            </div>
+            {selectedStatusPegawai === "PNS" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="tmtCpns" className="text-sm text-foreground">
+                    TMT CPNS
+                  </Label>
+                  <Input
+                    id="tmtCpns"
+                    type="date"
+                    max={todayString}
+                    value={formData.kepegawaian?.tmtCpns || ""}
+                    onChange={(e) => updateKepegawaianField("tmtCpns", e.target.value)}
+                    aria-invalid={Boolean(getFieldError("kepegawaian.tmtCpns"))}
+                    className={getInputClassName("kepegawaian.tmtCpns")}
+                  />
+                  {renderFieldError("kepegawaian.tmtCpns")}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tmtPns" className="text-sm text-foreground">
+                    TMT PNS <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="tmtPns"
+                    type="date"
+                    max={todayString}
+                    value={formData.kepegawaian?.tmtPns || ""}
+                    onChange={(e) => updateKepegawaianField("tmtPns", e.target.value)}
+                    aria-invalid={Boolean(getFieldError("kepegawaian.tmtPns"))}
+                    className={getInputClassName("kepegawaian.tmtPns")}
+                  />
+                  {renderFieldError("kepegawaian.tmtPns")}
+                </div>
+              </>
+            )}
+            {selectedStatusPegawai === "PPPK" && (
+              <div className="space-y-2">
+                <Label htmlFor="tmtPppk" className="text-sm text-foreground">
+                  TMT PPPK <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="tmtPppk"
+                  type="date"
+                  max={todayString}
+                  value={formData.kepegawaian?.tmtPppk || ""}
+                  onChange={(e) => updateKepegawaianField("tmtPppk", e.target.value)}
+                  aria-invalid={Boolean(getFieldError("kepegawaian.tmtPppk"))}
+                  className={getInputClassName("kepegawaian.tmtPppk")}
+                />
+                {renderFieldError("kepegawaian.tmtPppk")}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 pt-4 flex-col-reverse sm:flex-row">

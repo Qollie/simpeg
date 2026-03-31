@@ -37,6 +37,7 @@ class PegawaiStoreIntegrationTest extends TestCase
             'nipKepegawaian' => '198901012014031001',
             'statusPegawai' => 'PNS',
             'jenisPegawai' => 'Tenaga Struktural',
+            'tmtPns' => '2014-03-01',
             'masaKerjaTahun' => 0,
             'masaKerjaBulan' => 0,
         ]);
@@ -142,6 +143,7 @@ class PegawaiStoreIntegrationTest extends TestCase
             'nik' => '7301010101010001',
             'statusPegawai' => 'PNS',
             'jenisPegawai' => 'Tenaga Struktural',
+            'tmtPns' => '2014-03-01',
             'masaKerjaTahun' => 0,
             'masaKerjaBulan' => 0,
         ], $overrides);

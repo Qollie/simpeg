@@ -14,6 +14,7 @@ export interface Kepegawaian {
   jenisPegawai?: string
   tmtCpns?: string
   tmtPns?: string
+  tmtPppk?: string
   masaKerjaTahun?: number
   masaKerjaBulan?: number
 }

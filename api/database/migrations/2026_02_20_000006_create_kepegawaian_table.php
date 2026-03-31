@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('Kepegawaian')) {
+            return;
+        }
+
         Schema::create('Kepegawaian', function (Blueprint $table) {
             $table->char('nipKepegawaian', 18)->primary();
             $table->string('statusPegawai', 20);

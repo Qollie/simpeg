@@ -1,4 +1,8 @@
 import type { Dokumen, EfilePegawai, IdentitasResmi, Kepegawaian, Pegawai } from "@/lib/types"
+import {
+  jenisPegawaiLabelFromValue,
+  statusKepegawaianLabelFromValue,
+} from "@/lib/pegawai-form-shared"
 
 type AddPegawaiFormData = {
   nipPegawai: string
@@ -27,6 +31,7 @@ type AddPegawaiFormData = {
   jenisPegawai: string
   tmtCpns: string
   tmtPns: string
+  tmtPppk: string
 }
 
 type MasaKerja = {
@@ -106,10 +111,11 @@ export const buildAddPegawaiPayload = ({
     },
     kepegawaian: {
       nipKepegawaian: formData.nipPegawai,
-      statusPegawai: formData.statusPegawai,
-      jenisPegawai: formData.jenisPegawai,
+      statusPegawai: statusKepegawaianLabelFromValue(formData.statusPegawai),
+      jenisPegawai: jenisPegawaiLabelFromValue(formData.jenisPegawai),
       tmtCpns: formData.tmtCpns || undefined,
       tmtPns: formData.tmtPns || undefined,
+      tmtPppk: formData.tmtPppk || undefined,
       masaKerjaTahun: masaKerja.tahun,
       masaKerjaBulan: masaKerja.bulan,
     },

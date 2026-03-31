@@ -64,7 +64,7 @@ export function PromotionList({ data }: PromotionListProps) {
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent bg-secondary/30">
                 <TableHead className="text-muted-foreground">Pegawai</TableHead>
-                <TableHead className="text-muted-foreground">Masa Kerja</TableHead>
+                <TableHead className="text-muted-foreground">Lama Kerja</TableHead>
                 <TableHead className="text-muted-foreground">Golongan</TableHead>
                 <TableHead className="text-muted-foreground">Target</TableHead>
                 <TableHead className="text-center text-muted-foreground">Status</TableHead>

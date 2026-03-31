@@ -228,7 +228,7 @@ export function ModalLihatPegawai({
                     <DataRow label="TMT CPNS" value={formatDate(pegawai.kepegawaian.tmtCpns)} />
                     <DataRow label="TMT PNS" value={formatDate(pegawai.kepegawaian.tmtPns)} />
                     {pegawai.kepegawaian.masaKerjaTahun !== undefined && (
-                      <DataRow label="Masa Kerja" value={`${pegawai.kepegawaian.masaKerjaTahun}t ${pegawai.kepegawaian.masaKerjaBulan}b`} />
+                      <DataRow label="Lama Kerja" value={`${pegawai.kepegawaian.masaKerjaTahun}t ${pegawai.kepegawaian.masaKerjaBulan}b`} />
                     )}
                   </div>
                 </div>

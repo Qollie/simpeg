@@ -1,7 +1,51 @@
 export const agamaList = ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"]
 export const jenisKelaminList = ["Laki-laki", "Perempuan"]
-export const statusKepegawaianList = ["PNS", "PPPK", "Non-ASN"]
-export const jenisPegawaiList = ["Tenaga Struktural", "Tenaga Fungsional", "Tenaga Administrasi"]
+export const statusKepegawaianOptions = [
+  { value: "1", label: "PNS" },
+  { value: "2", label: "PPPK" },
+  { value: "3", label: "Non-ASN" },
+] as const
+
+export const jenisPegawaiOptions = [
+  { value: "1", label: "Tenaga Struktural" },
+  { value: "2", label: "Tenaga Fungsional" },
+  { value: "3", label: "Tenaga Administrasi" },
+] as const
+
+export const statusKepegawaianList = statusKepegawaianOptions.map((item) => item.label)
+export const jenisPegawaiList = jenisPegawaiOptions.map((item) => item.label)
+
+export const statusKepegawaianLabelFromValue = (value?: string) => {
+  if (!value) return ""
+  const byValue = statusKepegawaianOptions.find((item) => item.value === value)
+  if (byValue) return byValue.label
+  const byLabel = statusKepegawaianOptions.find((item) => item.label === value)
+  return byLabel?.label ?? value
+}
+
+export const statusKepegawaianValueFromValueOrLabel = (value?: string) => {
+  if (!value) return ""
+  const byValue = statusKepegawaianOptions.find((item) => item.value === value)
+  if (byValue) return byValue.value
+  const byLabel = statusKepegawaianOptions.find((item) => item.label === value)
+  return byLabel?.value ?? value
+}
+
+export const jenisPegawaiLabelFromValue = (value?: string) => {
+  if (!value) return ""
+  const byValue = jenisPegawaiOptions.find((item) => item.value === value)
+  if (byValue) return byValue.label
+  const byLabel = jenisPegawaiOptions.find((item) => item.label === value)
+  return byLabel?.label ?? value
+}
+
+export const jenisPegawaiValueFromValueOrLabel = (value?: string) => {
+  if (!value) return ""
+  const byValue = jenisPegawaiOptions.find((item) => item.value === value)
+  if (byValue) return byValue.value
+  const byLabel = jenisPegawaiOptions.find((item) => item.label === value)
+  return byLabel?.value ?? value
+}
 
 export const MAX_FOTO_SIZE_BYTES = 5 * 1024 * 1024
 
