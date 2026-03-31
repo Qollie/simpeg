@@ -28,7 +28,18 @@ const DEFAULT_PAGINATION: PaginationMeta = {
   total: 0,
 }
 
+// Normalize status coming from various API fields/casing
+const normalisasiStatusKarir = (p: any): string => {
+  const raw = (p?.status ?? p?.kepegawaian?.statusPegawai ?? "Aktif") as string
+  const lower = raw.toLowerCase()
+  if (["aktif", "active"].includes(lower)) return "Aktif"
+  if (["cuti"].includes(lower)) return "Cuti"
+  if (["pensiun", "resign", "berhenti", "nonaktif"].includes(lower)) return "Nonaktif"
+  return raw || "Aktif"
+}
+
 const mapPegawaiForModal = (p: any): Pegawai => {
+  const identitasSrc = p.identitasResmi ?? p.identitas_resmi ?? {}
   const riwayatTerbaru = [...(p.riwayatPangkat ?? [])]
     .sort((a: any, b: any) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
 
@@ -36,6 +47,15 @@ const mapPegawaiForModal = (p: any): Pegawai => {
 
   return {
     ...p,
+    identitasResmi: {
+      nipIdResmi: identitasSrc.nipIdResmi ?? identitasSrc.nip_id_resmi ?? p.nipPegawai ?? "",
+      nik: identitasSrc.nik ?? "",
+      noBpjs: identitasSrc.noBpjs ?? identitasSrc.no_bpjs ?? "",
+      noNpwp: identitasSrc.noNpwp ?? identitasSrc.no_npwp ?? "",
+      karpeg: identitasSrc.karpeg ?? "",
+      karsuKarsi: identitasSrc.karsuKarsi ?? identitasSrc.karsu_karsi ?? "",
+      taspen: identitasSrc.taspen ?? "",
+    },
     departemen: p.kepegawaian?.jenisPegawai ?? p.departemen,
     status: p.status ?? p.kepegawaian?.statusPegawai ?? "Aktif",
     tanggalMasuk: p.tanggalMasuk ?? p.kepegawaian?.tmtCpns ?? p.kepegawaian?.tmtPns,
@@ -104,7 +124,53 @@ export default function KarirPage() {
       .then((r) => r.json())
       .then((json) => {
         if (!mounted) return
-        setPromotionItems(json.data ?? [])
+        const items: any[] = json.data ?? []
+
+        const mapped: PromotionEligibilityItem[] = items.map((p: any) => {
+          const identitas = p.identitasResmi ?? p.identitas_resmi ?? {}
+          const kepegawaianRaw = p.kepegawaian ?? {}
+          const riwayatPangkatRaw = p.riwayatPangkat ?? p.riwayat_pangkat ?? []
+
+          const kepegawaian = {
+            ...kepegawaianRaw,
+            statusPegawai: kepegawaianRaw.statusPegawai ?? "",
+            jenisPegawai: kepegawaianRaw.jenisPegawai ?? p.departemen ?? "-",
+            tmtCpns: kepegawaianRaw.tmtCpns ?? p.tmtCpns ?? p.tanggalMasuk ?? null,
+            tmtPns: kepegawaianRaw.tmtPns ?? p.tmtPns ?? null,
+            masaKerjaTahun: kepegawaianRaw.masaKerjaTahun ?? p.masaKerjaTahun ?? 0,
+            masaKerjaBulan: kepegawaianRaw.masaKerjaBulan ?? p.masaKerjaBulan ?? 0,
+          }
+
+          const riwayatTerbaru = [...riwayatPangkatRaw]
+            .sort((a: any, b: any) => new Date(b?.tmtPangkat ?? 0).getTime() - new Date(a?.tmtPangkat ?? 0).getTime())[0]
+
+          const pangkatTerbaru = riwayatTerbaru?.pangkat
+          const golongan = pangkatTerbaru ? `${pangkatTerbaru.pangkat ?? ""} (${pangkatTerbaru.golongan ?? ""})`.trim() : p.golongan
+
+          return {
+            ...p,
+            identitasResmi: {
+              nipIdResmi: identitas.nipIdResmi ?? p.nipPegawai,
+              nik: identitas.nik ?? "",
+              noBpjs: identitas.noBpjs ?? "",
+              noNpwp: identitas.noNpwp ?? "",
+              karpeg: identitas.karpeg ?? "",
+              karsuKarsi: identitas.karsuKarsi ?? "",
+              taspen: identitas.taspen ?? "",
+            },
+            kepegawaian,
+            riwayatPangkat: riwayatPangkatRaw,
+            departemen: kepegawaian.jenisPegawai,
+            status: normalisasiStatusKarir({ ...p, status: p.status ?? kepegawaian.statusPegawai, kepegawaian }),
+            tanggalMasuk: p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
+            golongan,
+            tmtGolongan: riwayatTerbaru?.tmtPangkat ?? p.tanggalMasuk ?? kepegawaian.tmtCpns ?? kepegawaian.tmtPns,
+            masaKerjaGolonganTahun: Number(p.masaKerjaGolonganTahun ?? p.masaKerjaGolonganTahun ?? 0),
+            masaKerjaGolonganBulan: Number(p.masaKerjaGolonganBulan ?? p.masaKerjaGolonganBulan ?? 0),
+          }
+        })
+
+        setPromotionItems(mapped)
         setPromotionPagination({
           currentPage: json.current_page ?? 1,
           lastPage: json.last_page ?? 1,
@@ -210,23 +276,6 @@ export default function KarirPage() {
     return `Naik pangkat: ${careerSummary.promotionTotal} pegawai | Satyalancana: ${careerSummary.satyalancanaTotal} pegawai`
   }, [careerSummary.promotionTotal, careerSummary.satyalancanaTotal])
 
-  const handleDownloadPromotionCsv = () => {
-    const params = new URLSearchParams()
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
-    params.set("near_years", nearYears)
-
-    window.open(`/api/karir/naik-pangkat/export?${params.toString()}`, "_blank")
-  }
-
-  const handleDownloadSatyaCsv = () => {
-    const params = new URLSearchParams()
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
-    if (satyaStatus !== "semua") params.set("status", satyaStatus)
-    params.set("near_years", nearYears)
-
-    window.open(`/api/karir/satyalancana/export?${params.toString()}`, "_blank")
-  }
-
   return (
     <AdminLayout title="Peningkatan Karir">
       <div className="space-y-4 md:space-y-6">
@@ -287,12 +336,7 @@ export default function KarirPage() {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadPromotionCsv}>
-              <Download className="mr-1.5 h-3.5 w-3.5" /> Unduh CSV Naik Pangkat
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadSatyaCsv}>
-              <Download className="mr-1.5 h-3.5 w-3.5" /> Unduh CSV Satyalancana
-            </Button>
+            {/* Tombol unduh CSV dihapus sesuai permintaan */}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">{summaryText}</p>
         </div>
@@ -324,4 +368,3 @@ export default function KarirPage() {
     </AdminLayout>
   )
 }
-

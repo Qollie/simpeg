@@ -8,6 +8,7 @@ use App\Models\Kepegawaian;
 use App\Models\IdentitasResmi;
 use App\Models\Pangkat;
 use App\Models\Pegawai;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
+    private function maximumBirthDate(): string
+    {
+        return Carbon::today()->subYears(17)->toDateString();
+    }
+
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 15);
@@ -50,9 +56,7 @@ class PegawaiController extends Controller
         }
 
         if ($status && $status !== 'Semua') {
-            $query->whereHas('kepegawaian', function ($kepegawaian) use ($status) {
-                $kepegawaian->where('statusPegawai', 'ilike', "%{$status}%");
-            });
+            $query->where('status', 'ilike', "%{$status}%");
         }
 
         $result = $query->orderBy('nama')->paginate($perPage, ['*'], 'page', $page);
@@ -73,9 +77,8 @@ class PegawaiController extends Controller
             ->values();
 
         $statusOptions = Pegawai::query()
-            ->join('Kepegawaian', 'Kepegawaian.nipKepegawaian', '=', 'Pegawai.nipPegawai')
-            ->whereNotNull('Kepegawaian.statusPegawai')
-            ->selectRaw('DISTINCT "Kepegawaian"."statusPegawai" as value')
+            ->whereNotNull('Pegawai.status')
+            ->selectRaw('DISTINCT "Pegawai"."status" as value')
             ->orderBy('value')
             ->pluck('value')
             ->filter()
@@ -111,37 +114,37 @@ class PegawaiController extends Controller
         $identitasTable = (new IdentitasResmi())->getTable();
 
         $validated = $request->validate([
-            'nipPegawai' => ['required', 'string', 'max:25', Rule::unique($pegawaiTable, 'nipPegawai')],
+            'nipPegawai' => ['required', 'string', 'size:18', Rule::unique($pegawaiTable, 'nipPegawai')],
             'nama' => ['required', 'string', 'max:150'],
             'gelarDepan' => ['nullable', 'string', 'max:50'],
             'gelarBelakang' => ['nullable', 'string', 'max:50'],
             'tempatLahir' => ['required', 'string', 'max:100'],
-            'tanggalLahir' => ['required', 'date'],
-            'jenisKelamin' => ['required', 'string', 'max:20'],
+            'tanggalLahir' => ['required', 'date', 'before_or_equal:'.$this->maximumBirthDate()],
+            'jenisKelamin' => ['required', 'string', 'max:10'],
             'agama' => ['required', 'string', 'max:20'],
             'alamat' => ['nullable', 'string'],
             'email' => ['required', 'email', 'max:120', Rule::unique($pegawaiTable, 'email')],
             'noHp' => ['required', 'string', 'max:20'],
             'jabatan' => ['required', 'string', 'max:150'],
             'golongan' => ['required', 'string', 'max:100'],
-            'status' => ['required', 'string', 'max:30'],
+            'status' => ['required', 'string', 'max:20'],
             'departemen' => ['required', 'string', 'max:150'],
-            'tanggalMasuk' => ['required', 'date'],
+            'tanggalMasuk' => ['required', 'date', 'before_or_equal:today'],
             'foto' => ['nullable', 'file', 'image', 'max:5120'],
 
             // Identitas resmi
-            'nik' => ['required', 'string', 'max:30', Rule::unique($identitasTable, 'nik')],
-            'noBpjs' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noBpjs')],
-            'noNpwp' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noNpwp')],
+            'nik' => ['required', 'string', 'size:16', Rule::unique($identitasTable, 'nik')],
+            'noBpjs' => ['nullable', 'string', 'max:20', Rule::unique($identitasTable, 'noBpjs')],
+            'noNpwp' => ['nullable', 'string', 'max:25', Rule::unique($identitasTable, 'noNpwp')],
             'karpeg' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karpeg')],
             'karsuKarsi' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karsuKarsi')],
             'taspen' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'taspen')],
 
             // Kepegawaian
-            'statusPegawai' => ['required', 'string', 'max:50'],
-            'jenisPegawai' => ['required', 'string', 'max:100'],
-            'tmtCpns' => ['required', 'date'],
-            'tmtPns' => ['nullable', 'date'],
+            'statusPegawai' => ['required', 'string', 'max:20'],
+            'jenisPegawai' => ['required', 'string', 'max:50'],
+            'tmtCpns' => ['nullable', 'date', 'before_or_equal:today'],
+            'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
             'masaKerjaTahun' => ['required', 'integer', 'min:0'],
             'masaKerjaBulan' => ['required', 'integer', 'min:0', 'max:11'],
         ]);
@@ -191,7 +194,7 @@ class PegawaiController extends Controller
                 'nipKepegawaian' => $validated['nipPegawai'],
                 'statusPegawai' => $validated['statusPegawai'],
                 'jenisPegawai' => $validated['jenisPegawai'],
-                'tmtCpns' => $validated['tmtCpns'],
+                'tmtCpns' => $validated['tmtCpns'] ?? null,
                 'tmtPns' => $validated['tmtPns'] ?? null,
                 'masaKerjaTahun' => $validated['masaKerjaTahun'],
                 'masaKerjaBulan' => $validated['masaKerjaBulan'],
@@ -216,32 +219,32 @@ class PegawaiController extends Controller
             'gelarDepan' => ['nullable', 'string', 'max:50'],
             'gelarBelakang' => ['nullable', 'string', 'max:50'],
             'tempatLahir' => ['nullable', 'string', 'max:100'],
-            'tanggalLahir' => ['nullable', 'date'],
-            'jenisKelamin' => ['nullable', 'string', 'max:20'],
+            'tanggalLahir' => ['nullable', 'date', 'before_or_equal:'.$this->maximumBirthDate()],
+            'jenisKelamin' => ['nullable', 'string', 'max:10'],
             'agama' => ['nullable', 'string', 'max:20'],
             'alamat' => ['nullable', 'string'],
             'email' => ['nullable', 'email', 'max:120', 'unique:Pegawai,email,'.$id.',nipPegawai'],
             'noHp' => ['nullable', 'string', 'max:20'],
             'jabatan' => ['nullable', 'string', 'max:150'],
             'golongan' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'string', 'max:30'],
+            'status' => ['nullable', 'string', 'max:20'],
             'departemen' => ['nullable', 'string', 'max:150'],
-            'tanggalMasuk' => ['nullable', 'date'],
+            'tanggalMasuk' => ['nullable', 'date', 'before_or_equal:today'],
             'foto' => ['nullable', 'file', 'image', 'max:5120'],
 
             // Identitas resmi
-            'nik' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'nik')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
-            'noBpjs' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noBpjs')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
-            'noNpwp' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'noNpwp')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'nik' => ['nullable', 'string', 'size:16', Rule::unique($identitasTable, 'nik')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'noBpjs' => ['nullable', 'string', 'max:20', Rule::unique($identitasTable, 'noBpjs')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
+            'noNpwp' => ['nullable', 'string', 'max:25', Rule::unique($identitasTable, 'noNpwp')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
             'karpeg' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karpeg')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
             'karsuKarsi' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'karsuKarsi')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
             'taspen' => ['nullable', 'string', 'max:30', Rule::unique($identitasTable, 'taspen')->ignore($pegawai->identitasResmi?->nipIdResmi, 'nipIdResmi')],
 
             // Kepegawaian
-            'statusPegawai' => ['nullable', 'string', 'max:50'],
-            'jenisPegawai' => ['nullable', 'string', 'max:100'],
-            'tmtCpns' => ['nullable', 'date'],
-            'tmtPns' => ['nullable', 'date'],
+            'statusPegawai' => ['nullable', 'string', 'max:20'],
+            'jenisPegawai' => ['nullable', 'string', 'max:50'],
+            'tmtCpns' => ['nullable', 'date', 'before_or_equal:today'],
+            'tmtPns' => ['nullable', 'date', 'before_or_equal:today'],
             'masaKerjaTahun' => ['nullable', 'integer', 'min:0'],
             'masaKerjaBulan' => ['nullable', 'integer', 'min:0', 'max:11'],
         ]);

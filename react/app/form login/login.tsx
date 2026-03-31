@@ -40,7 +40,6 @@ export default function LoginPage() {
   const turnstileSiteKey = import.meta.env
     .VITE_TURNSTILE_SITE_KEY as string | undefined;
   const disableTurnstile =
-    import.meta.env.DEV ||
     String(import.meta.env.VITE_DISABLE_TURNSTILE ?? "false").toLowerCase() === "true";
 
   useEffect(() => {
@@ -215,13 +214,26 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col relative">
       {/* Background Image */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="/storage/login/bgLogin.jpeg"
-          alt="Kantor Disdukcapil Samarinda"
-          className="w-full h-full object-cover"
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute inset-0 bg-slate-950" aria-hidden />
+        <div
+          className="absolute inset-0 opacity-75"
+          aria-hidden
+          style={{
+            background:
+              "radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.28), transparent 32%), radial-gradient(circle at 80% 15%, rgba(59, 130, 246, 0.24), transparent 28%), radial-gradient(circle at 55% 80%, rgba(14, 165, 233, 0.22), transparent 30%)",
+          }}
         />
-        <div className="absolute inset-0 bg-black/60" />
+        <img
+          src="/bg-login.jpeg"
+          alt="Kantor Disdukcapil Samarinda"
+          loading="lazy"
+          className="w-full h-full object-cover opacity-92 mix-blend-screen"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-b from-white/10 via-black/15 to-black/30"
+          aria-hidden
+        />
       </div>
 
       {/* Login Form */}
