@@ -260,6 +260,7 @@ export default function PegawaiPage() {
     putField('jenisPegawai', updatedPegawai.kepegawaian?.jenisPegawai || updatedPegawai.departemen)
     putField('tmtCpns', updatedPegawai.kepegawaian?.tmtCpns)
     putField('tmtPns', updatedPegawai.kepegawaian?.tmtPns)
+    putField('tmtPppk', updatedPegawai.kepegawaian?.tmtPppk)
     putField('masaKerjaTahun', updatedPegawai.kepegawaian?.masaKerjaTahun)
     putField('masaKerjaBulan', updatedPegawai.kepegawaian?.masaKerjaBulan)
 
@@ -380,6 +381,7 @@ export default function PegawaiPage() {
     put('jenisPegawai', newPegawai.kepegawaian?.jenisPegawai)
     put('tmtCpns', newPegawai.kepegawaian?.tmtCpns)
     put('tmtPns', newPegawai.kepegawaian?.tmtPns)
+    put('tmtPppk', newPegawai.kepegawaian?.tmtPppk)
     put('masaKerjaTahun', newPegawai.kepegawaian?.masaKerjaTahun ?? 0)
     put('masaKerjaBulan', newPegawai.kepegawaian?.masaKerjaBulan ?? 0)
 

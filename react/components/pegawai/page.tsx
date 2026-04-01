@@ -39,7 +39,8 @@ type KarirProcessStatusItem = {
   id: number
   nipPegawai: string
   nama: string
-  status: "blm" | "sdh diproses"
+  golongan: string | null
+  status: boolean
 }
 
 // Normalize status coming from various API fields/casing
@@ -320,7 +321,7 @@ export default function KarirPage() {
     return `Naik pangkat: ${careerSummary.promotionTotal} pegawai | Satyalancana: ${careerSummary.satyalancanaTotal} pegawai`
   }, [careerSummary.promotionTotal, careerSummary.satyalancanaTotal])
 
-  const handleChangeProcessStatus = async (item: KarirProcessStatusItem, status: "blm" | "sdh diproses") => {
+  const handleChangeProcessStatus = async (item: KarirProcessStatusItem, status: boolean) => {
     try {
       const response = await fetch(`/api/karir/status-proses/${item.nipPegawai}`, {
         method: "PATCH",
@@ -335,24 +336,31 @@ export default function KarirPage() {
         throw new Error("Gagal memperbarui status proses")
       }
 
-      setProcessItems((prev) => prev.map((row) => (row.nipPegawai === item.nipPegawai ? { ...row, status } : row)))
+      const data = await response.json()
+      setProcessItems((prev) =>
+        prev.map((row) =>
+          row.nipPegawai === item.nipPegawai
+            ? { ...row, status: data.status as boolean, golongan: data.golongan ?? row.golongan }
+            : row
+        )
+      )
     } catch {
       // Keep UI unchanged when request fails
     }
   }
 
-  const processStatusBadgeClass = (status: "blm" | "sdh diproses") =>
-    status === "sdh diproses"
+  const processStatusBadgeClass = (status: boolean) =>
+    status
       ? "border-green-200 bg-green-100 text-green-700"
       : "border-amber-200 bg-amber-100 text-amber-700"
 
-  const processStatusSelectClass = (status: "blm" | "sdh diproses") =>
-    status === "sdh diproses"
+  const processStatusSelectClass = (status: boolean) =>
+    status
       ? "h-9 rounded-md border-green-200 bg-green-50/70 text-green-700"
       : "h-9 rounded-md border-amber-200 bg-amber-50/70 text-amber-700"
 
-  const processStatusLabel = (status: "blm" | "sdh diproses") =>
-    status === "sdh diproses" ? "Sudah Diproses" : "Belum Diproses"
+  const processStatusLabel = (status: boolean) =>
+    status ? "Sudah Diproses" : "Belum Diproses"
 
   return (
     <AdminLayout title="Peningkatan Karir">
@@ -454,19 +462,20 @@ export default function KarirPage() {
                   <TableHead className="w-[90px] text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">ID</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">NIP</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nama Pegawai</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pangkat / Golongan</TableHead>
                   <TableHead className="w-[220px] text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status Proses</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {processLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
                       Memuat status proses...
                     </TableCell>
                   </TableRow>
                 ) : processItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
                       Data status proses belum tersedia.
                     </TableCell>
                   </TableRow>
@@ -480,21 +489,22 @@ export default function KarirPage() {
                       </TableCell>
                       <TableCell className="font-mono text-[12px]">{item.nipPegawai}</TableCell>
                       <TableCell className="font-medium">{item.nama}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{item.golongan ?? "-"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={`rounded-full text-[11px] ${processStatusBadgeClass(item.status)}`}>
                             {processStatusLabel(item.status)}
                           </Badge>
                           <Select
-                            value={item.status}
-                            onValueChange={(value) => handleChangeProcessStatus(item, value as "blm" | "sdh diproses")}
+                            value={item.status ? "true" : "false"}
+                            onValueChange={(value) => handleChangeProcessStatus(item, value === "true")}
                           >
                             <SelectTrigger className={`w-[140px] text-xs ${processStatusSelectClass(item.status)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="blm">Belum Diproses</SelectItem>
-                              <SelectItem value="sdh diproses">Sudah Diproses</SelectItem>
+                              <SelectItem value="false">Belum Diproses</SelectItem>
+                              <SelectItem value="true">Sudah Diproses</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

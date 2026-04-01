@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\KarirStatusProses;
+use App\Models\Pangkat;
 use App\Models\Pegawai;
+use App\Models\RiwayatPangkat;
+use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -124,11 +127,23 @@ class CareerController extends Controller
         $perPage = max(1, min((int) $request->query('per_page', 10), 100));
         $q = trim((string) $request->query('q', ''));
 
+        $latestRankSub = DB::table('RiwayatPangkat as rp')
+            ->selectRaw('rp."nipRiwayat", MAX(rp."idRiwayat") as latest_id')
+            ->groupBy('rp.nipRiwayat');
+
         $query = DB::table('Pegawai as p')
             ->leftJoin('Kepegawaian as k', 'k.nipKepegawaian', '=', 'p.nipPegawai')
+            ->leftJoinSub($latestRankSub, 'lr', function ($join) {
+                $join->on('lr.nipRiwayat', '=', 'p.nipPegawai');
+            })
+            ->leftJoin('RiwayatPangkat as rp', function ($join) {
+                $join->on('rp.idRiwayat', '=', 'lr.latest_id');
+            })
+            ->leftJoin('Pangkat as pg', 'pg.idPangkat', '=', 'rp.idPangkatRiwayat')
             ->select([
                 'p.nipPegawai',
                 'p.nama',
+                DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, '/', pg.ruang, ')'), p.golongan) as golongan"),
             ])
             ->whereRaw("LOWER(COALESCE(NULLIF(TRIM(p.\"status\"), ''), NULLIF(TRIM(k.\"statusPegawai\"), ''), 'aktif')) NOT IN ('cuti','pensiun','nonaktif','resign')");
 
@@ -144,14 +159,15 @@ class CareerController extends Controller
         $items = array_map(function ($row) {
             $status = KarirStatusProses::query()->firstOrCreate(
                 ['nipPegawai' => $row->nipPegawai],
-                ['status' => 'blm']
+                ['status' => false]
             );
 
             return [
-                'id' => $status->id,
+                'id'         => $status->id,
                 'nipPegawai' => $row->nipPegawai,
-                'nama' => $row->nama,
-                'status' => $status->status,
+                'nama'       => $row->nama,
+                'golongan'   => $row->golongan,
+                'status'     => (bool) $status->status,
             ];
         }, $paginated->items());
 
@@ -166,21 +182,86 @@ class CareerController extends Controller
 
     public function updateProcessStatus(Request $request, string $nip)
     {
-        Pegawai::query()->findOrFail($nip);
+        $pegawai = Pegawai::query()->findOrFail($nip);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:blm,sdh diproses'],
+            'status' => ['required', 'boolean'],
         ]);
 
-        $item = KarirStatusProses::query()->updateOrCreate(
-            ['nipPegawai' => $nip],
-            ['status' => $validated['status']]
-        );
+        $result = DB::transaction(function () use ($nip, $pegawai, $validated) {
+            $existing = KarirStatusProses::query()->where('nipPegawai', $nip)->first();
+            $sudahDiprosesBefore = $existing && (bool) $existing->status === true;
+
+            $statusItem = KarirStatusProses::query()->updateOrCreate(
+                ['nipPegawai' => $nip],
+                ['status' => $validated['status']]
+            );
+
+            // Hanya naik pangkat jika baru pertama kali diproses (bukan update ulang)
+            if ($validated['status'] === true && !$sudahDiprosesBefore) {
+                // Ambil riwayat pangkat terakhir
+                $latestRiwayat = RiwayatPangkat::query()
+                    ->where('nipRiwayat', $nip)
+                    ->orderByDesc('tmtPangkat')
+                    ->first();
+
+                // Cari pangkat saat ini dari riwayat, atau dari kolom golongan di Pegawai
+                $currentPangkat = $latestRiwayat
+                    ? Pangkat::query()->find($latestRiwayat->idPangkatRiwayat)
+                    : Pangkat::query()
+                        ->whereRaw("CONCAT(pangkat, ' (', golongan, '/', ruang, ')') = ?", [$pegawai->golongan])
+                        ->first();
+
+                if (!$currentPangkat) {
+                    return ['statusItem' => $statusItem, 'golongan' => $pegawai->golongan, 'naik' => false];
+                }
+
+                $nextPangkat = Pangkat::query()
+                    ->where('urutan', $currentPangkat->urutan + 1)
+                    ->first();
+
+                // Sudah di pangkat tertinggi, tidak perlu naik
+                if (!$nextPangkat) {
+                    return ['statusItem' => $statusItem, 'golongan' => $pegawai->golongan, 'naik' => false];
+                }
+
+                $today = Carbon::today()->toDateString();
+
+                // Tutup riwayat lama
+                if ($latestRiwayat) {
+                    $latestRiwayat->tmtSelesai = $today;
+                    $latestRiwayat->status = false;
+                    $latestRiwayat->save();
+                }
+
+                // Buat riwayat pangkat baru
+                RiwayatPangkat::create([
+                    'nipRiwayat'       => $nip,
+                    'idPangkatRiwayat' => $nextPangkat->idPangkat,
+                    'tmtPangkat'       => $today,
+                    'tmtSelesai'       => null,
+                    'status'           => true,
+                ]);
+
+                // Update kolom golongan di Pegawai
+                $newGolongan = sprintf('%s (%s/%s)', $nextPangkat->pangkat, $nextPangkat->golongan, $nextPangkat->ruang);
+                $pegawai->golongan = $newGolongan;
+                $pegawai->save();
+
+                return ['statusItem' => $statusItem, 'golongan' => $newGolongan, 'naik' => true];
+            }
+
+            // Jika kembali ke false, ambil golongan terkini dari DB
+            $pegawai->refresh();
+            return ['statusItem' => $statusItem, 'golongan' => $pegawai->golongan, 'naik' => false];
+        });
 
         return response()->json([
-            'id' => $item->id,
-            'nipPegawai' => $item->nipPegawai,
-            'status' => $item->status,
+            'id'         => $result['statusItem']->id,
+            'nipPegawai' => $result['statusItem']->nipPegawai,
+            'status'     => (bool) $result['statusItem']->status,
+            'golongan'   => $result['golongan'],
+            'naik'       => $result['naik'],
         ]);
     }
 
@@ -274,6 +355,7 @@ class CareerController extends Controller
             ])
             ->whereNotNull('b.tmtGolonganAktif')
             ->whereRaw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date <= CURRENT_DATE")
+            ->where('b.statusProses', '<>', true)
             ->where(function ($sub) use ($maxRankOrder) {
                 $sub->where('b.rankOrder', 0)
                     ->orWhere('b.rankOrder', '<', $maxRankOrder);
@@ -376,7 +458,7 @@ class CareerController extends Controller
     private function pegawaiBaseQuery(Request $request): Builder
     {
         $latestRankSub = DB::table('RiwayatPangkat as rp')
-            ->selectRaw('rp."nipRiwayat", MAX(rp."tmtPangkat") as latest_tmt')
+            ->selectRaw('rp."nipRiwayat", MAX(rp."idRiwayat") as latest_id')
             ->groupBy('rp.nipRiwayat');
 
         $statusRaw = "LOWER(COALESCE(NULLIF(TRIM(p.\"status\"), ''), NULLIF(TRIM(k.\"statusPegawai\"), ''), 'aktif'))";
@@ -388,8 +470,7 @@ class CareerController extends Controller
                 $join->on('lr.nipRiwayat', '=', 'p.nipPegawai');
             })
             ->leftJoin('RiwayatPangkat as rp', function ($join) {
-                $join->on('rp.nipRiwayat', '=', 'lr.nipRiwayat')
-                    ->on('rp.tmtPangkat', '=', 'lr.latest_tmt');
+                $join->on('rp.idRiwayat', '=', 'lr.latest_id');
             })
             ->leftJoin('Pangkat as pg', 'pg.idPangkat', '=', 'rp.idPangkatRiwayat')
             ->select([
@@ -398,11 +479,20 @@ class CareerController extends Controller
                 'p.foto',
                 'p.jabatan',
                 DB::raw('ks.id as "statusProsesId"'),
-                DB::raw("COALESCE(ks.status, 'blm') as \"statusProses\""),
-                DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan) as golongan"),
-                DB::raw("COALESCE(rp.\"tmtPangkat\", k.\"tmtPns\", k.\"tmtPppk\", k.\"tmtCpns\", p.\"tanggalMasuk\") as \"tmtGolonganAktif\""),
+                DB::raw("COALESCE(ks.status, false) as \"statusProses\""),
+                DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, '/', pg.ruang, ')'), p.golongan) as golongan"),
+                DB::raw("COALESCE(
+                    rp.\"tmtPangkat\",
+                    CASE LOWER(TRIM(k.\"statusPegawai\"))
+                        WHEN 'pppk'    THEN k.\"tmtPppk\"
+                        WHEN 'pns'     THEN COALESCE(k.\"tmtPns\", k.\"tmtCpns\")
+                        WHEN 'non-asn' THEN p.\"tanggalMasuk\"
+                        ELSE COALESCE(k.\"tmtPns\", k.\"tmtPppk\", k.\"tmtCpns\")
+                    END,
+                    p.\"tanggalMasuk\"
+                ) as \"tmtGolonganAktif\""),
                 DB::raw("COALESCE(p.\"tanggalMasuk\", k.\"tmtPns\", k.\"tmtPppk\", k.\"tmtCpns\") as \"tanggalMasuk\""),
-                DB::raw($this->rankCaseExpression("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, ')'), p.golongan)") . ' as "rankOrder"'),
+                DB::raw($this->rankCaseExpression("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, '/', pg.ruang, ')'), p.golongan)") . ' as "rankOrder"'),
             ])
             ->whereRaw($statusRaw . " NOT IN ('cuti','pensiun','nonaktif','resign')");
     }

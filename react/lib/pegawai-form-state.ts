@@ -4,6 +4,23 @@ import {
   jenisPegawaiValueFromValueOrLabel,
   statusKepegawaianValueFromValueOrLabel,
 } from "@/lib/pegawai-form-shared"
+import { golonganList } from "@/lib/mock-data"
+
+// Normalize golongan string agar cocok dengan golonganList
+// Contoh: "Penata Muda (III)" → "Penata Muda (III/a)"
+const normalizeGolongan = (golongan: string): string => {
+  if (!golongan) return ""
+  // Jika sudah ada di list, kembalikan langsung
+  if (golonganList.includes(golongan)) return golongan
+  // Coba cari match berdasarkan awalan (pangkat + golongan tanpa ruang)
+  // Format lama: "Penata Muda (III)" → cocokkan ke "Penata Muda (III/a)"
+  const match = golonganList.find((g) => {
+    // Strip ruang dari golonganList entry: "Penata Muda (III/a)" → "Penata Muda (III)"
+    const withoutRuang = g.replace(/\/[a-e]\)$/, ")")
+    return withoutRuang === golongan
+  })
+  return match ?? golongan
+}
 
 export type AddPegawaiFormState = {
   nipPegawai: string
@@ -95,6 +112,7 @@ export const normalizePegawaiToEditForm = (pegawai: Pegawai): Partial<Pegawai> =
 
   return {
     ...pegawai,
+    golongan: normalizeGolongan(pegawai.golongan ?? ""),
     status: pegawai.status ?? pegawai.kepegawaian?.statusPegawai ?? "",
     departemen: pegawai.departemen ?? pegawai.kepegawaian?.jenisPegawai ?? "",
     identitasResmi: ensureIdentitasResmi(pegawai, pegawai.identitasResmi),

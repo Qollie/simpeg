@@ -83,11 +83,11 @@ export function AddEmployeeModal({
   ) => {
     const { name, value } = e.target
     setFormData((prev) => {
-      if (name === "tmtPns") {
+      if (name === "tmtPns" || name === "tmtPppk") {
         const masaKerja = calculateMasaKerja(value)
         return {
           ...prev,
-          tmtPns: value,
+          [name]: value,
           masaKerjaTahun: String(masaKerja.tahun),
           masaKerjaBulan: String(masaKerja.bulan),
         }
@@ -98,7 +98,7 @@ export function AddEmployeeModal({
     setFieldErrors((prev) => {
       const next = { ...prev }
       delete next[name as keyof FormErrors]
-      if (name === "tmtPns") {
+      if (name === "tmtPns" || name === "tmtPppk") {
         delete next.masaKerjaTahun
         delete next.masaKerjaBulan
       }

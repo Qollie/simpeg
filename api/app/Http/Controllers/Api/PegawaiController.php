@@ -30,6 +30,41 @@ class PegawaiController extends Controller
         '3' => 'Tenaga Administrasi',
     ];
 
+    private const JENIS_KELAMIN_MAP = [
+        '1' => 'Laki-laki',
+        '2' => 'Perempuan',
+    ];
+
+    private const AGAMA_MAP = [
+        '1' => 'Islam',
+        '2' => 'Kristen',
+        '3' => 'Katolik',
+        '4' => 'Hindu',
+        '5' => 'Buddha',
+        '6' => 'Konghucu',
+        '7' => 'Lainnya',
+    ];
+
+    private const GOLONGAN_MAP = [
+        '1'  => 'Juru Muda (I/a)',
+        '2'  => 'Juru Muda Tingkat I (I/b)',
+        '3'  => 'Juru (I/c)',
+        '4'  => 'Juru Tingkat I (I/d)',
+        '5'  => 'Pengatur Muda (II/a)',
+        '6'  => 'Pengatur Muda Tingkat I (II/b)',
+        '7'  => 'Pengatur (II/c)',
+        '8'  => 'Pengatur Tingkat I (II/d)',
+        '9'  => 'Penata Muda (III/a)',
+        '10' => 'Penata Muda Tingkat I (III/b)',
+        '11' => 'Penata (III/c)',
+        '12' => 'Penata Tingkat I (III/d)',
+        '13' => 'Pembina (IV/a)',
+        '14' => 'Pembina Tingkat I (IV/b)',
+        '15' => 'Pembina Utama Muda (IV/c)',
+        '16' => 'Pembina Utama Madya (IV/d)',
+        '17' => 'Pembina Utama (IV/e)',
+    ];
+
     private function maximumBirthDate(): string
     {
         return Carbon::today()->subYears(17)->toDateString();
@@ -43,6 +78,21 @@ class PegawaiController extends Controller
     private function mapJenisPegawai(string $value): string
     {
         return self::JENIS_PEGAWAI_MAP[$value] ?? $value;
+    }
+
+    private function mapJenisKelamin(string $value): string
+    {
+        return self::JENIS_KELAMIN_MAP[$value] ?? $value;
+    }
+
+    private function mapAgama(string $value): string
+    {
+        return self::AGAMA_MAP[$value] ?? $value;
+    }
+
+    private function mapGolongan(string $value): string
+    {
+        return self::GOLONGAN_MAP[$value] ?? $value;
     }
 
     private function normalizeKepegawaianDates(array $validated): array
@@ -192,6 +242,9 @@ class PegawaiController extends Controller
 
         $validated['statusPegawai'] = $this->mapStatusPegawai((string) $validated['statusPegawai']);
         $validated['jenisPegawai'] = $this->mapJenisPegawai((string) $validated['jenisPegawai']);
+        $validated['jenisKelamin'] = $this->mapJenisKelamin((string) $validated['jenisKelamin']);
+        $validated['agama'] = $this->mapAgama((string) $validated['agama']);
+        $validated['golongan'] = $this->mapGolongan((string) $validated['golongan']);
         $validated = $this->normalizeKepegawaianDates($validated);
 
         $fotoPath = null;
@@ -301,6 +354,15 @@ class PegawaiController extends Controller
         }
         if (array_key_exists('jenisPegawai', $validated)) {
             $validated['jenisPegawai'] = $this->mapJenisPegawai((string) $validated['jenisPegawai']);
+        }
+        if (array_key_exists('jenisKelamin', $validated)) {
+            $validated['jenisKelamin'] = $this->mapJenisKelamin((string) $validated['jenisKelamin']);
+        }
+        if (array_key_exists('agama', $validated)) {
+            $validated['agama'] = $this->mapAgama((string) $validated['agama']);
+        }
+        if (array_key_exists('golongan', $validated)) {
+            $validated['golongan'] = $this->mapGolongan((string) $validated['golongan']);
         }
         $validated = $this->normalizeKepegawaianDates($validated);
 
