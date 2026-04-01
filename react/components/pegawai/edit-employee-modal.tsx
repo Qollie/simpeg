@@ -21,17 +21,21 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import {
-  agamaList,
+  agamaOptions,
   calculateMasaKerja,
+  departemenOptions,
+  golonganOptions,
   jenisPegawaiOptions,
-  jenisKelaminList,
+  jenisKelaminOptions,
   MAX_FOTO_SIZE_BYTES,
   maximumBirthDateString,
+  statusInternalOptions,
   statusKepegawaianLabelFromValue,
   statusKepegawaianOptions,
   todayString,
 } from "@/lib/pegawai-form-shared"
 import {
+  applyAgeAtJoinValidation,
   applyBirthDateValidation,
   applyDateNotAfterTodayValidation,
   applyEmailValidation,
@@ -47,7 +51,6 @@ import {
 import { buildEditPegawaiPayload } from "@/lib/pegawai-form-payload"
 import { ensureIdentitasResmi, ensureKepegawaian, normalizePegawaiToEditForm } from "@/lib/pegawai-form-state"
 import type { IdentitasResmi, Kepegawaian, Pegawai } from "@/lib/types"
-import { departemenList, statusList, golonganList } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 type FormErrors = Record<string, string>
@@ -208,6 +211,7 @@ export function EditEmployeeModal({
     applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtPns", "TMT PNS", `${formData.kepegawaian?.tmtPns ?? ""}`.trim())
     applyDateNotAfterTodayValidation(nextErrors, "kepegawaian.tmtPppk", "TMT PPPK", `${formData.kepegawaian?.tmtPppk ?? ""}`.trim())
     applyBirthDateValidation(nextErrors, "tanggalLahir", `${formData.tanggalLahir ?? ""}`.trim())
+    applyAgeAtJoinValidation(nextErrors, `${formData.tanggalLahir ?? ""}`.trim(), `${formData.tanggalMasuk ?? ""}`.trim())
     applyMasaKerjaValidation(
       nextErrors,
       "kepegawaian.masaKerjaTahun",
@@ -419,13 +423,11 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih departemen" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departemenList
-                    .filter((d) => d !== "Semua")
-                    .map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
+                  {departemenOptions.map((dept) => (
+                    <SelectItem key={dept.value} value={dept.value}>
+                      {dept.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {renderFieldError("departemen")}
@@ -445,9 +447,9 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih golongan" />
                 </SelectTrigger>
                 <SelectContent>
-                  {golonganList.map((gol) => (
-                    <SelectItem key={gol} value={gol}>
-                      {gol}
+                  {golonganOptions.map((gol) => (
+                    <SelectItem key={gol.value} value={gol.value}>
+                      {gol.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -505,8 +507,8 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih" />
                 </SelectTrigger>
                 <SelectContent>
-                  {jenisKelaminList.map((jk) => (
-                    <SelectItem key={jk} value={jk}>{jk}</SelectItem>
+                  {jenisKelaminOptions.map((jk) => (
+                    <SelectItem key={jk.value} value={jk.value}>{jk.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -525,8 +527,8 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih" />
                 </SelectTrigger>
                 <SelectContent>
-                  {agamaList.map((ag) => (
-                    <SelectItem key={ag} value={ag}>{ag}</SelectItem>
+                  {agamaOptions.map((ag) => (
+                    <SelectItem key={ag.value} value={ag.value}>{ag.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -566,9 +568,9 @@ export function EditEmployeeModal({
                   <SelectValue placeholder="Pilih Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statusList.slice(1).map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
+                  {statusInternalOptions.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

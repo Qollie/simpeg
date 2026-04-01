@@ -168,6 +168,7 @@ class CareerController extends Controller
                 'nama'       => $row->nama,
                 'golongan'   => $row->golongan,
                 'status'     => (bool) $status->status,
+                'promotedAt' => $status->status ? optional($status->updated_at)->toDateString() : null,
             ];
         }, $paginated->items());
 
@@ -262,6 +263,7 @@ class CareerController extends Controller
             'status'     => (bool) $result['statusItem']->status,
             'golongan'   => $result['golongan'],
             'naik'       => $result['naik'],
+            'promotedAt' => $result['statusItem']->status ? optional($result['statusItem']->updated_at)->toDateString() : null,
         ]);
     }
 

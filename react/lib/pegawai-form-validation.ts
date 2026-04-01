@@ -154,6 +154,23 @@ export const applyBirthDateValidation = (errors: Record<string, string>, key: st
   }
 }
 
+export const applyAgeAtJoinValidation = (
+  errors: Record<string, string>,
+  tanggalLahir: string,
+  tanggalMasuk: string
+) => {
+  if (!tanggalLahir || !tanggalMasuk) return
+  const lahir = new Date(tanggalLahir)
+  const masuk = new Date(tanggalMasuk)
+  if (isNaN(lahir.getTime()) || isNaN(masuk.getTime())) return
+  const minMasuk = new Date(lahir)
+  minMasuk.setFullYear(minMasuk.getFullYear() + 17)
+  if (masuk < minMasuk) {
+    errors["tanggalLahir"] = "Pegawai harus berumur minimal 17 tahun saat tanggal masuk."
+    errors["tanggalMasuk"] = "Tanggal masuk terlalu awal — pegawai belum berumur 17 tahun."
+  }
+}
+
 export const applyMasaKerjaValidation = (
   errors: Record<string, string>,
   tahunKey: string,

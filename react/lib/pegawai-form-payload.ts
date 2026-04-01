@@ -2,6 +2,11 @@ import type { Dokumen, EfilePegawai, IdentitasResmi, Kepegawaian, Pegawai } from
 import {
   jenisPegawaiLabelFromValue,
   statusKepegawaianLabelFromValue,
+  departemenLabelFromValue,
+  statusInternalLabelFromValue,
+  agamaLabelFromValue,
+  jenisKelaminLabelFromValue,
+  golonganLabelFromValue,
 } from "@/lib/pegawai-form-shared"
 
 type AddPegawaiFormData = {
@@ -12,7 +17,7 @@ type AddPegawaiFormData = {
   jabatan: string
   departemen: string
   golongan: string
-  status: "Aktif" | "Cuti" | "Pensiun"
+  status: string
   tanggalMasuk: string
   email: string
   noHp: string
@@ -88,17 +93,17 @@ export const buildAddPegawaiPayload = ({
     gelarDepan: formData.gelarDepan || undefined,
     gelarBelakang: formData.gelarBelakang || undefined,
     jabatan: formData.jabatan || undefined,
-    departemen: formData.departemen || undefined,
-    golongan: formData.golongan || undefined,
-    status: formData.status,
+    departemen: departemenLabelFromValue(formData.departemen) || undefined,
+    golongan: golonganLabelFromValue(formData.golongan) || undefined,
+    status: statusInternalLabelFromValue(formData.status) as "Aktif" | "Cuti" | "Pensiun",
     tanggalMasuk: formData.tanggalMasuk || undefined,
     email: formData.email || undefined,
     noHp: formData.noHp,
     foto: fotoPreview || undefined,
     tempatLahir: formData.tempatLahir,
     tanggalLahir: formData.tanggalLahir,
-    jenisKelamin: formData.jenisKelamin,
-    agama: formData.agama || undefined,
+    jenisKelamin: jenisKelaminLabelFromValue(formData.jenisKelamin),
+    agama: agamaLabelFromValue(formData.agama) || undefined,
     alamat: formData.alamat || undefined,
     identitasResmi: {
       nipIdResmi: formData.nipPegawai,
@@ -132,6 +137,11 @@ export const buildEditPegawaiPayload = ({
   return {
     ...pegawai,
     ...formData,
+    departemen: departemenLabelFromValue(formData.departemen) || formData.departemen,
+    status: statusInternalLabelFromValue(formData.status) as Pegawai["status"],
+    golongan: golonganLabelFromValue(formData.golongan) || formData.golongan,
+    agama: agamaLabelFromValue(formData.agama) || formData.agama,
+    jenisKelamin: jenisKelaminLabelFromValue(formData.jenisKelamin) || formData.jenisKelamin,
     identitasResmi,
     kepegawaian,
   } as Pegawai

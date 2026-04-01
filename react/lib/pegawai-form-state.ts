@@ -3,6 +3,11 @@ import { calculateMasaKerja } from "@/lib/pegawai-form-shared"
 import {
   jenisPegawaiValueFromValueOrLabel,
   statusKepegawaianValueFromValueOrLabel,
+  departemenValueFromValueOrLabel,
+  statusInternalValueFromValueOrLabel,
+  agamaValueFromValueOrLabel,
+  jenisKelaminValueFromValueOrLabel,
+  golonganValueFromValueOrLabel,
 } from "@/lib/pegawai-form-shared"
 import { golonganList } from "@/lib/mock-data"
 
@@ -30,7 +35,7 @@ export type AddPegawaiFormState = {
   jabatan: string
   departemen: string
   golongan: string
-  status: "Aktif" | "Cuti" | "Pensiun"
+  status: string
   tanggalMasuk: string
   email: string
   noHp: string
@@ -62,13 +67,13 @@ export const createInitialAddPegawaiForm = (): AddPegawaiFormState => ({
   jabatan: "",
   departemen: "",
   golongan: "",
-  status: "Aktif",
+  status: "1",
   tanggalMasuk: "",
   email: "",
   noHp: "",
   tempatLahir: "",
   tanggalLahir: "",
-  jenisKelamin: "",
+  jenisKelamin: "1",
   agama: "",
   alamat: "",
   nik: "",
@@ -112,9 +117,11 @@ export const normalizePegawaiToEditForm = (pegawai: Pegawai): Partial<Pegawai> =
 
   return {
     ...pegawai,
-    golongan: normalizeGolongan(pegawai.golongan ?? ""),
-    status: pegawai.status ?? pegawai.kepegawaian?.statusPegawai ?? "",
-    departemen: pegawai.departemen ?? pegawai.kepegawaian?.jenisPegawai ?? "",
+    golongan: golonganValueFromValueOrLabel(normalizeGolongan(pegawai.golongan ?? "")),
+    status: statusInternalValueFromValueOrLabel(pegawai.status ?? ""),
+    departemen: departemenValueFromValueOrLabel(pegawai.departemen ?? pegawai.kepegawaian?.jenisPegawai ?? ""),
+    agama: agamaValueFromValueOrLabel(pegawai.agama ?? ""),
+    jenisKelamin: jenisKelaminValueFromValueOrLabel(pegawai.jenisKelamin ?? ""),
     identitasResmi: ensureIdentitasResmi(pegawai, pegawai.identitasResmi),
     kepegawaian: ensureKepegawaian(pegawai, {
       ...pegawai.kepegawaian,

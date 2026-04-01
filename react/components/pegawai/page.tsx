@@ -41,6 +41,7 @@ type KarirProcessStatusItem = {
   nama: string
   golongan: string | null
   status: boolean
+  promotedAt: string | null
 }
 
 // Normalize status coming from various API fields/casing
@@ -98,6 +99,7 @@ export default function KarirPage() {
 
   const [promotionPage, setPromotionPage] = useState(1)
   const [satyaPage, setSatyaPage] = useState(1)
+  const [promotionRefreshKey, setPromotionRefreshKey] = useState(0)
 
   const [promotionLoading, setPromotionLoading] = useState(false)
   const [satyaLoading, setSatyaLoading] = useState(false)
@@ -206,7 +208,7 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [promotionPage, perPage, nearYears, searchQuery])
+  }, [promotionPage, perPage, nearYears, searchQuery, promotionRefreshKey])
 
   useEffect(() => {
     let mounted = true
@@ -340,13 +342,23 @@ export default function KarirPage() {
       setProcessItems((prev) =>
         prev.map((row) =>
           row.nipPegawai === item.nipPegawai
-            ? { ...row, status: data.status as boolean, golongan: data.golongan ?? row.golongan }
+            ? { ...row, status: data.status as boolean, golongan: data.golongan ?? row.golongan, promotedAt: data.promotedAt ?? row.promotedAt }
             : row
         )
       )
+      if (status) {
+        setPromotionRefreshKey((k) => k + 1)
+      }
     } catch {
       // Keep UI unchanged when request fails
     }
+  }
+
+  const estimasiNaikPangkatBerikutnya = (promotedAt: string | null): string => {
+    if (!promotedAt) return "Estimasi: +4 tahun dari tanggal naik"
+    const d = new Date(promotedAt)
+    d.setFullYear(d.getFullYear() + 4)
+    return `Estimasi layak: ${d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`
   }
 
   const processStatusBadgeClass = (status: boolean) =>
@@ -459,11 +471,10 @@ export default function KarirPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/35">
-                  <TableHead className="w-[90px] text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">ID</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">NIP</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nama Pegawai</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pangkat / Golongan</TableHead>
-                  <TableHead className="w-[220px] text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status Proses</TableHead>
+                  <TableHead className="w-[220px] text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status Proses</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -482,32 +493,35 @@ export default function KarirPage() {
                 ) : (
                   processItems.map((item) => (
                     <TableRow key={item.nipPegawai} className="transition-colors hover:bg-muted/25">
-                      <TableCell>
-                        <Badge variant="outline" className="rounded-md px-2 py-0.5 text-[11px]">
-                          #{item.id}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="font-mono text-[12px]">{item.nipPegawai}</TableCell>
                       <TableCell className="font-medium">{item.nama}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{item.golongan ?? "-"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={`rounded-full text-[11px] ${processStatusBadgeClass(item.status)}`}>
-                            {processStatusLabel(item.status)}
-                          </Badge>
-                          <Select
-                            value={item.status ? "true" : "false"}
-                            onValueChange={(value) => handleChangeProcessStatus(item, value === "true")}
-                          >
-                            <SelectTrigger className={`w-[140px] text-xs ${processStatusSelectClass(item.status)}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="false">Belum Diproses</SelectItem>
-                              <SelectItem value="true">Sudah Diproses</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <TableCell className="text-center">
+                        {item.status ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <Badge variant="outline" className={`rounded-full text-[11px] ${processStatusBadgeClass(item.status)}`}>
+                              {processStatusLabel(item.status)}
+                            </Badge>
+                            <p className="text-[10px] text-muted-foreground">
+                              {estimasiNaikPangkatBerikutnya(item.promotedAt)}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <Select
+                              value="false"
+                              onValueChange={(value) => handleChangeProcessStatus(item, value === "true")}
+                            >
+                              <SelectTrigger className={`w-[160px] text-xs ${processStatusSelectClass(item.status)}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="false">Belum Diproses</SelectItem>
+                                <SelectItem value="true">Sudah Diproses</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

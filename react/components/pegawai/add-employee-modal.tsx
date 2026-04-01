@@ -20,12 +20,15 @@ import {
 import { Upload, X, Camera, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
-  agamaList,
+  agamaOptions,
   calculateMasaKerja,
+  departemenOptions,
+  golonganOptions as golonganStaticOptions,
   jenisPegawaiOptions,
-  jenisKelaminList,
+  jenisKelaminOptions,
   MAX_FOTO_SIZE_BYTES,
   maximumBirthDateString,
+  statusInternalOptions,
   statusKepegawaianLabelFromValue,
   statusKepegawaianOptions,
   todayString,
@@ -33,6 +36,7 @@ import {
 import {
   addPegawaiFieldLabels,
   addPegawaiMaxLengthRules,
+  applyAgeAtJoinValidation,
   applyBirthDateValidation,
   applyDateNotAfterTodayValidation,
   applyEmailValidation,
@@ -46,7 +50,6 @@ import {
 import { buildAddPegawaiPayload, buildDokumenObjects, buildEfilesFromDokumen } from "@/lib/pegawai-form-payload"
 import { createInitialAddPegawaiForm, type AddPegawaiFormState } from "@/lib/pegawai-form-state"
 import type { Pegawai, Dokumen, EfilePegawai } from "@/lib/types"
-import { departemenList, golonganList, statusList } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 interface AddEmployeeModalProps {
@@ -224,6 +227,7 @@ export function AddEmployeeModal({
     applyDateNotAfterTodayValidation(nextErrors, "tmtPns", "TMT PNS", formData.tmtPns.trim())
     applyDateNotAfterTodayValidation(nextErrors, "tmtPppk", "TMT PPPK", formData.tmtPppk.trim())
     applyBirthDateValidation(nextErrors, "tanggalLahir", formData.tanggalLahir.trim())
+    applyAgeAtJoinValidation(nextErrors, formData.tanggalLahir.trim(), formData.tanggalMasuk.trim())
     applyMasaKerjaValidation(nextErrors, "masaKerjaTahun", "masaKerjaBulan", calculatedMasaKerja.tahun, calculatedMasaKerja.bulan)
 
     if (Object.keys(nextErrors).length > 0) {
@@ -453,13 +457,11 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih departemen" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departemenList
-                      .filter((d) => d !== "Semua")
-                      .map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
-                        </SelectItem>
-                      ))}
+                    {departemenOptions.map((dept) => (
+                      <SelectItem key={dept.value} value={dept.value}>
+                        {dept.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {renderFieldError("departemen")}
@@ -481,9 +483,9 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih golongan" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(golonganOptions.length > 0 ? golonganOptions : golonganList).map((gol) => (
-                      <SelectItem key={gol} value={gol}>
-                        {gol}
+                    {golonganStaticOptions.map((gol) => (
+                      <SelectItem key={gol.value} value={gol.value}>
+                        {gol.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -508,9 +510,9 @@ export function AddEmployeeModal({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {statusList.slice(1).map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
+                    {statusInternalOptions.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -589,8 +591,8 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih" />
                   </SelectTrigger>
                   <SelectContent>
-                    {jenisKelaminList.map((jk) => (
-                      <SelectItem key={jk} value={jk}>{jk}</SelectItem>
+                    {jenisKelaminOptions.map((jk) => (
+                      <SelectItem key={jk.value} value={jk.value}>{jk.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -609,8 +611,8 @@ export function AddEmployeeModal({
                     <SelectValue placeholder="Pilih" />
                   </SelectTrigger>
                   <SelectContent>
-                    {agamaList.map((ag) => (
-                      <SelectItem key={ag} value={ag}>{ag}</SelectItem>
+                    {agamaOptions.map((ag) => (
+                      <SelectItem key={ag.value} value={ag.value}>{ag.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
