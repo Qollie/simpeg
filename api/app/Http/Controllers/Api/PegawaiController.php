@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\EfilePegawai;
 use App\Models\Kepegawaian;
 use App\Models\IdentitasResmi;
+use App\Models\KarirStatusProses;
 use App\Models\Pangkat;
 use App\Models\Pegawai;
+use App\Models\RiwayatPangkat;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -309,6 +311,7 @@ class PegawaiController extends Controller
     public function update(Request $request, string $id)
     {
         $pegawai = Pegawai::with(['identitasResmi', 'kepegawaian', 'riwayatPangkat.pangkat', 'efiles'])->findOrFail($id);
+        $existingKepegawaian = $pegawai->kepegawaian;
 
         $pegawaiTable = (new Pegawai())->getTable();
         $identitasTable = (new IdentitasResmi())->getTable();
@@ -398,7 +401,7 @@ class PegawaiController extends Controller
 
         // Update kepegawaian (if any kepegawaian-related field provided)
         if ($request->hasAny(['statusPegawai', 'jenisPegawai', 'tmtCpns', 'tmtPns', 'tmtPppk', 'masaKerjaTahun', 'masaKerjaBulan', 'departemen'])) {
-            $existing = Kepegawaian::where('nipKepegawaian', $id)->first();
+            $existing = $existingKepegawaian ?? Kepegawaian::where('nipKepegawaian', $id)->first();
 
             $kepegawaianPayload = [
                 'statusPegawai' => $request->input('statusPegawai', $existing?->statusPegawai),
@@ -424,6 +427,21 @@ class PegawaiController extends Controller
                 ['nipKepegawaian' => $id],
                 $kepegawaianPayload + ['nipKepegawaian' => $id]
             );
+
+            $oldTmtPns = $existing?->tmtPns ? Carbon::parse($existing->tmtPns)->toDateString() : null;
+            $newTmtPns = !empty($kepegawaianPayload['tmtPns'])
+                ? Carbon::parse($kepegawaianPayload['tmtPns'])->toDateString()
+                : null;
+
+            if ($oldTmtPns !== $newTmtPns) {
+                KarirStatusProses::query()
+                    ->where('nipPegawai', $id)
+                    ->delete();
+
+                RiwayatPangkat::query()
+                    ->where('nipRiwayat', $id)
+                    ->delete();
+            }
         }
 
         $pegawai->refresh()->load(['identitasResmi', 'kepegawaian', 'riwayatPangkat.pangkat', 'efiles']);

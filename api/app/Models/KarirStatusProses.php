@@ -10,6 +10,17 @@ class KarirStatusProses extends Model
 
     protected $fillable = [
         'nipPegawai',
+        'cycleNumber',
+        'tmtGolonganDasar',
+        'eligibleDate',
         'status',
+        'processedAt',
+    ];
+
+    protected $casts = [
+        'status' => 'boolean',
+        'tmtGolonganDasar' => 'date',
+        'eligibleDate' => 'date',
+        'processedAt' => 'date',
     ];
 }

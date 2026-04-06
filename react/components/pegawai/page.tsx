@@ -28,6 +28,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const DEFAULT_PAGINATION: PaginationMeta = {
   currentPage: 1,
@@ -40,8 +51,11 @@ type KarirProcessStatusItem = {
   nipPegawai: string
   nama: string
   golongan: string | null
+  cycleNumber: number
+  tmtGolonganDasar: string | null
+  eligibleDate: string | null
   status: boolean
-  promotedAt: string | null
+  processedAt: string | null
 }
 
 // Normalize status coming from various API fields/casing
@@ -100,6 +114,7 @@ export default function KarirPage() {
   const [promotionPage, setPromotionPage] = useState(1)
   const [satyaPage, setSatyaPage] = useState(1)
   const [promotionRefreshKey, setPromotionRefreshKey] = useState(0)
+  const [processRefreshKey, setProcessRefreshKey] = useState(0)
 
   const [promotionLoading, setPromotionLoading] = useState(false)
   const [satyaLoading, setSatyaLoading] = useState(false)
@@ -123,6 +138,7 @@ export default function KarirPage() {
     pegawai: Pegawai | null
     konteks: "promosi" | "satyalancana" | null
   }>({ terbuka: false, pegawai: null, konteks: null })
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false)
 
   useEffect(() => {
     setPromotionPage(1)
@@ -272,7 +288,7 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [promotionPage, perPage, searchQuery])
+  }, [promotionPage, perPage, searchQuery, processRefreshKey])
 
   useEffect(() => {
     let mounted = true
@@ -305,7 +321,7 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [searchQuery, nearYears])
+  }, [searchQuery, nearYears, promotionRefreshKey])
 
   const handleLihatDetail = (nip: string, konteks: "promosi" | "satyalancana") => {
     fetch(`/api/pegawai/${nip}`)
@@ -325,7 +341,7 @@ export default function KarirPage() {
 
   const handleChangeProcessStatus = async (item: KarirProcessStatusItem, status: boolean) => {
     try {
-      const response = await fetch(`/api/karir/status-proses/${item.nipPegawai}`, {
+      const response = await fetch(`/api/karir/status-proses/${item.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -338,14 +354,7 @@ export default function KarirPage() {
         throw new Error("Gagal memperbarui status proses")
       }
 
-      const data = await response.json()
-      setProcessItems((prev) =>
-        prev.map((row) =>
-          row.nipPegawai === item.nipPegawai
-            ? { ...row, status: data.status as boolean, golongan: data.golongan ?? row.golongan, promotedAt: data.promotedAt ?? row.promotedAt }
-            : row
-        )
-      )
+      setProcessRefreshKey((k) => k + 1)
       if (status) {
         setPromotionRefreshKey((k) => k + 1)
       }
@@ -354,11 +363,35 @@ export default function KarirPage() {
     }
   }
 
-  const estimasiNaikPangkatBerikutnya = (promotedAt: string | null): string => {
-    if (!promotedAt) return "Estimasi: +4 tahun dari tanggal naik"
-    const d = new Date(promotedAt)
-    d.setFullYear(d.getFullYear() + 4)
-    return `Estimasi layak: ${d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`
+  const handleSyncProcessTable = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (searchQuery.trim()) params.set("q", searchQuery.trim())
+
+      const response = await fetch(`/api/karir/status-proses/sync?${params.toString()}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error("Gagal menyinkronkan data status proses")
+      }
+
+      setProcessRefreshKey((k) => k + 1)
+      setPromotionRefreshKey((k) => k + 1)
+      setSyncDialogOpen(false)
+    } catch {
+      // Keep UI unchanged when request fails
+    }
+  }
+
+  const formatTanggal = (value: string | null): string => {
+    if (!value) return "-"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "-"
+    return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
   }
 
   const processStatusBadgeClass = (status: boolean) =>
@@ -371,8 +404,7 @@ export default function KarirPage() {
       ? "h-9 rounded-md border-green-200 bg-green-50/70 text-green-700"
       : "h-9 rounded-md border-amber-200 bg-amber-50/70 text-amber-700"
 
-  const processStatusLabel = (status: boolean) =>
-    status ? "Sudah Diproses" : "Belum Diproses"
+  const processStatusLabel = (status: boolean) => (status ? "Sudah Diproses" : "Belum Diproses")
 
   return (
     <AdminLayout title="Peningkatan Karir">
@@ -462,9 +494,14 @@ export default function KarirPage() {
               <p className="text-sm font-semibold tracking-tight">Status Proses Karir</p>
               <p className="mt-1 text-xs text-muted-foreground">Pantau progres pemrosesan karir per pegawai.</p>
             </div>
-            <Badge variant="outline" className="rounded-full border-border/70 bg-muted/40 px-2.5 py-1 text-[11px]">
-              {processItems.length} data
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="rounded-full border-border/70 bg-muted/40 px-2.5 py-1 text-[11px]">
+                {processItems.length} data
+              </Badge>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSyncDialogOpen(true)}>
+                Sync
+              </Button>
+            </div>
           </div>
 
           <div className="mt-3 overflow-hidden rounded-lg border border-border/70">
@@ -474,42 +511,54 @@ export default function KarirPage() {
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">NIP</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nama Pegawai</TableHead>
                   <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pangkat / Golongan</TableHead>
-                  <TableHead className="w-[220px] text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status Proses</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Siklus</TableHead>
+                  <TableHead className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tanggal Siklus</TableHead>
+                  <TableHead className="w-[240px] text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status Proses</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {processLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
                       Memuat status proses...
                     </TableCell>
                   </TableRow>
                 ) : processItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
                       Data status proses belum tersedia.
                     </TableCell>
                   </TableRow>
                 ) : (
                   processItems.map((item) => (
-                    <TableRow key={item.nipPegawai} className="transition-colors hover:bg-muted/25">
+                    <TableRow key={item.id} className="transition-colors hover:bg-muted/25">
                       <TableCell className="font-mono text-[12px]">{item.nipPegawai}</TableCell>
                       <TableCell className="font-medium">{item.nama}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{item.golongan ?? "-"}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">Siklus {item.cycleNumber}</p>
+                          <p className="text-muted-foreground">Konfirmasi kenaikan pangkat ke-{item.cycleNumber}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div className="space-y-1">
+                          <p>TMT dasar: {formatTanggal(item.tmtGolonganDasar)}</p>
+                          <p>Layak sejak: {formatTanggal(item.eligibleDate)}</p>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">
                         {item.status ? (
                           <div className="flex flex-col items-center gap-1">
                             <Badge variant="outline" className={`rounded-full text-[11px] ${processStatusBadgeClass(item.status)}`}>
                               {processStatusLabel(item.status)}
                             </Badge>
-                            <p className="text-[10px] text-muted-foreground">
-                              {estimasiNaikPangkatBerikutnya(item.promotedAt)}
-                            </p>
+                            <p className="text-[10px] text-muted-foreground">Diproses pada {formatTanggal(item.processedAt)}</p>
                           </div>
                         ) : (
                           <div className="flex justify-center">
                             <Select
-                              value="false"
+                              value={String(item.status)}
                               onValueChange={(value) => handleChangeProcessStatus(item, value === "true")}
                             >
                               <SelectTrigger className={`w-[160px] text-xs ${processStatusSelectClass(item.status)}`}>
@@ -538,6 +587,23 @@ export default function KarirPage() {
         tutup={() => setModalLihat({ terbuka: false, pegawai: null, konteks: null })}
         hapusDokumen={() => {}}
       />
+
+      <AlertDialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <AlertDialogContent className="border-border bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Konfirmasi Sync</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Sinkronkan data status proses karir untuk menampilkan siklus yang sudah jatuh tempo tetapi belum tercatat?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-secondary text-foreground hover:bg-secondary/80">Batal</AlertDialogCancel>
+            <AlertDialogAction className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSyncProcessTable}>
+              Sync Sekarang
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   )
 }
