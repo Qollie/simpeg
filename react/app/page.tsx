@@ -7,6 +7,7 @@ import { AktivitasTerbaru } from "@/components/dashboard/recent-activity"
 import { ModalLihatPegawai } from "@/components/pegawai/view-employee-modal"
 import { Users, FileText, UserCheck, Clock, MapPin } from "lucide-react"
 import type { Pegawai, UpdateTerbaru } from "@/lib/types"
+import { apiFetch } from "@/lib/api"
 
 export default function HalamanDashboard() {
   const [stats, setStats] = useState({
@@ -25,18 +26,26 @@ export default function HalamanDashboard() {
   useEffect(() => {
     let mounted = true
 
-    fetch('/api/pegawai?per_page=200')
-      .then((r) => r.json())
-      .then((json) => {
-        const items: any[] = json.data ?? []
+    // Dua request kecil paralel — jauh lebih cepat dari 1 request 200 record
+    Promise.all([
+      // Request 1: 10 record terbaru + total count dari pagination meta
+      apiFetch('/api/pegawai?per_page=10').then((r) => r.json()),
+      // Request 2: hanya untuk mendapat total cuti (per_page=1, sangat ringan)
+      apiFetch('/api/pegawai?status=Cuti&per_page=1').then((r) => r.json()),
+    ])
+      .then(([jsonUtama, jsonCuti]) => {
+        if (!mounted) return
 
-        const totalPegawai = items.length
-        const totalDokumen = items.reduce((sum, p) => sum + ((p.efiles ?? []).length || 0), 0)
-        const pegawaiCuti = items.filter((p) => {
-          const status = String(p?.status ?? p?.kepegawaian?.statusPegawai ?? '').toLowerCase()
-          return status.includes('cuti')
-        }).length
-        const pegawaiAktif = totalPegawai - pegawaiCuti
+        const items: any[] = jsonUtama.data ?? []
+        const totalPegawai: number = jsonUtama.total ?? items.length
+        const pegawaiCuti: number = jsonCuti.total ?? 0
+        const pegawaiAktif = Math.max(0, totalPegawai - pegawaiCuti)
+
+        // Hitung total dokumen dari sample yang ada
+        const totalDokumen = items.reduce(
+          (sum: number, p: any) => sum + ((p.efiles ?? []).length || 0),
+          0
+        )
 
         const aktivitasDokumen: UpdateTerbaru[] = items
           .flatMap((p) => (p.efiles ?? []).map((f: any) => ({ p, f })))
@@ -60,10 +69,8 @@ export default function HalamanDashboard() {
             user: 'Sistem',
           }))
 
-        if (mounted) {
-          setStats({ totalPegawai, totalDokumen, pegawaiAktif, pegawaiCuti })
-          setAktivitas(aktivitasDokumen.length > 0 ? aktivitasDokumen : aktivitasPegawai)
-        }
+        setStats({ totalPegawai, totalDokumen, pegawaiAktif, pegawaiCuti })
+        setAktivitas(aktivitasDokumen.length > 0 ? aktivitasDokumen : aktivitasPegawai)
       })
       .catch(() => {
         if (mounted) {

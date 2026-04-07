@@ -10,7 +10,6 @@ use App\Models\RiwayatPangkat;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -128,15 +127,34 @@ class CareerController extends Controller
         $perPage = max(1, min((int) $request->query('per_page', 10), 100));
         $page = max(1, (int) $request->query('page', 1));
         $q = trim((string) $request->query('q', ''));
-        $pendidikan = $this->normalisasiPendidikan((string) $request->query('default_pendidikan', 'S1'));
-        $maxRankOrder = $this->golonganOrder(self::BATAS_PANGKAT_PENDIDIKAN[$pendidikan] ?? 'Pembina (IV/a)');
 
-        $this->ensureCurrentPromotionCycles($request, $maxRankOrder);
+        // Subquery: untuk tiap pegawai, cari cycleNumber pertama yang belum diproses
+        $firstPendingSub = DB::table('KarirStatusProses')
+            ->selectRaw('"nipPegawai", MIN("cycleNumber") as first_pending_cycle')
+            ->whereNotNull('eligibleDate')
+            ->where('status', false)
+            ->groupBy('nipPegawai');
+
+        // Subquery pegawai: hanya ambil nama & golongan (lebih ringan dari pegawaiBaseQuery)
+        $latestRankSub = DB::table('RiwayatPangkat as rp')
+            ->selectRaw('rp."nipRiwayat", MAX(rp."idRiwayat") as latest_id')
+            ->groupBy('rp.nipRiwayat');
+
+        $pegawaiSub = DB::table('Pegawai as p')
+            ->leftJoin('Kepegawaian as k', 'k.nipKepegawaian', '=', 'p.nipPegawai')
+            ->leftJoinSub($latestRankSub, 'lr', 'lr.nipRiwayat', '=', 'p.nipPegawai')
+            ->leftJoin('RiwayatPangkat as rp', 'rp.idRiwayat', '=', 'lr.latest_id')
+            ->leftJoin('Pangkat as pg', 'pg.idPangkat', '=', 'rp.idPangkatRiwayat')
+            ->select([
+                'p.nipPegawai',
+                'p.nama',
+                DB::raw("COALESCE(pg.pangkat || ' (' || pg.golongan || '/' || pg.ruang || ')', p.golongan) as golongan"),
+            ])
+            ->whereRaw("LOWER(COALESCE(NULLIF(TRIM(p.\"status\"), ''), NULLIF(TRIM(k.\"statusPegawai\"), ''), 'aktif')) NOT IN ('cuti','pensiun','nonaktif','resign')");
 
         $query = DB::table('KarirStatusProses as ks')
-            ->joinSub($this->pegawaiBaseQuery($request), 'b', function ($join) {
-                $join->on('b.nipPegawai', '=', 'ks.nipPegawai');
-            })
+            ->joinSub($pegawaiSub, 'b', 'b.nipPegawai', '=', 'ks.nipPegawai')
+            ->leftJoinSub($firstPendingSub, 'pm', 'pm.nipPegawai', '=', 'ks.nipPegawai')
             ->select([
                 'ks.id',
                 'ks.nipPegawai',
@@ -148,7 +166,9 @@ class CareerController extends Controller
                 'ks.status',
                 'ks.processedAt',
             ])
-            ->whereNotNull('ks.eligibleDate');
+            ->whereNotNull('ks.eligibleDate')
+            // Tampilkan siklus s.d. siklus pertama yang belum diproses; jika semua sudah diproses tampilkan semuanya
+            ->whereRaw('ks."cycleNumber" <= COALESCE(pm.first_pending_cycle, ks."cycleNumber")');
 
         if ($q !== '') {
             $query->where(function ($sub) use ($q) {
@@ -157,73 +177,30 @@ class CareerController extends Controller
             });
         }
 
-        $rows = collect($query
+        $paginated = $query
             ->orderByDesc('ks.eligibleDate')
             ->orderByDesc('ks.cycleNumber')
             ->orderBy('b.nama')
-            ->get())
-            ->groupBy('nipPegawai')
-            ->flatMap(function ($pegawaiRows) {
-                $ordered = $pegawaiRows->sortBy('cycleNumber')->values();
-                $firstPendingIndex = $ordered->search(fn ($row) => !(bool) $row->status);
+            ->paginate($perPage, ['*'], 'page', $page);
 
-                if ($firstPendingIndex === false) {
-                    return $ordered;
-                }
-
-                return $ordered->slice(0, $firstPendingIndex + 1)->values();
-            })
-            ->sort(function ($a, $b) {
-                $dateCompare = strcmp((string) $b->eligibleDate, (string) $a->eligibleDate);
-                if ($dateCompare !== 0) {
-                    return $dateCompare;
-                }
-
-                $cycleCompare = (int) $b->cycleNumber <=> (int) $a->cycleNumber;
-                if ($cycleCompare !== 0) {
-                    return $cycleCompare;
-                }
-
-                return strcmp((string) $a->nama, (string) $b->nama);
-            })
-            ->values();
-
-        $total = $rows->count();
-        $items = $rows
-            ->slice(($page - 1) * $perPage, $perPage)
-            ->values()
-            ->map(function ($row) {
-                return [
-                    'id'         => $row->id,
-                    'nipPegawai' => $row->nipPegawai,
-                    'nama'       => $row->nama,
-                    'golongan'   => $row->golongan,
-                    'cycleNumber' => (int) $row->cycleNumber,
-                    'tmtGolonganDasar' => $row->tmtGolonganDasar,
-                    'eligibleDate' => $row->eligibleDate,
-                    'status'     => (bool) $row->status,
-                    'processedAt' => $row->processedAt,
-                ];
-            })
-            ->all();
-
-        $paginated = new LengthAwarePaginator(
-            $items,
-            $total,
-            $perPage,
-            $page,
-            [
-                'path' => $request->url(),
-                'query' => $request->query(),
-            ]
-        );
+        $items = collect($paginated->items())->map(fn ($row) => [
+            'id'               => $row->id,
+            'nipPegawai'       => $row->nipPegawai,
+            'nama'             => $row->nama,
+            'golongan'         => $row->golongan,
+            'cycleNumber'      => (int) $row->cycleNumber,
+            'tmtGolonganDasar' => $row->tmtGolonganDasar,
+            'eligibleDate'     => $row->eligibleDate,
+            'status'           => (bool) $row->status,
+            'processedAt'      => $row->processedAt,
+        ])->all();
 
         return response()->json([
-            'data' => $items,
+            'data'         => $items,
             'current_page' => $paginated->currentPage(),
-            'last_page' => $paginated->lastPage(),
-            'per_page' => $paginated->perPage(),
-            'total' => $paginated->total(),
+            'last_page'    => $paginated->lastPage(),
+            'per_page'     => $paginated->perPage(),
+            'total'        => $paginated->total(),
         ]);
     }
 
@@ -252,11 +229,12 @@ class CareerController extends Controller
                     ->orderByDesc('tmtPangkat')
                     ->first();
 
-                // Cari pangkat saat ini dari riwayat, atau dari kolom golongan di Pegawai
+                // Cari pangkat saat ini dari riwayat, atau dari kolom golongan di Pegawai.
+                // Gunakan || (bukan CONCAT) agar lookup konsisten dengan format penyimpanan.
                 $currentPangkat = $latestRiwayat
                     ? Pangkat::query()->find($latestRiwayat->idPangkatRiwayat)
                     : Pangkat::query()
-                        ->whereRaw("CONCAT(pangkat, ' (', golongan, '/', ruang, ')') = ?", [$pegawai->golongan])
+                        ->whereRaw("pangkat || ' (' || golongan || '/' || ruang || ')' = ?", [$pegawai->golongan])
                         ->first();
 
                 if (!$currentPangkat) {
@@ -541,7 +519,11 @@ class CareerController extends Controller
                 'p.nama',
                 'p.foto',
                 'p.jabatan',
-                DB::raw("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, '/', pg.ruang, ')'), p.golongan) as golongan"),
+                // Gunakan || (bukan CONCAT) agar NULL dari LEFT JOIN tetap NULL,
+                // sehingga COALESCE bisa fallback ke p.golongan dengan benar.
+                // CONCAT(NULL,...) = ' (/'  → COALESCE salah pilih nilai kosong.
+                // NULL || ...     = NULL   → COALESCE benar fallback ke p.golongan.
+                DB::raw("COALESCE(pg.pangkat || ' (' || pg.golongan || '/' || pg.ruang || ')', p.golongan) as golongan"),
                 DB::raw("COALESCE(
                     rp.\"tmtPangkat\",
                     CASE LOWER(TRIM(k.\"statusPegawai\"))
@@ -553,7 +535,7 @@ class CareerController extends Controller
                     p.\"tanggalMasuk\"
                 ) as \"tmtGolonganAktif\""),
                 DB::raw("COALESCE(p.\"tanggalMasuk\", k.\"tmtPns\", k.\"tmtPppk\", k.\"tmtCpns\") as \"tanggalMasuk\""),
-                DB::raw($this->rankCaseExpression("COALESCE(CONCAT(pg.pangkat, ' (', pg.golongan, '/', pg.ruang, ')'), p.golongan)") . ' as "rankOrder"'),
+                DB::raw($this->rankCaseExpression("COALESCE(pg.pangkat || ' (' || pg.golongan || '/' || pg.ruang || ')', p.golongan)") . ' as "rankOrder"'),
             ])
             ->whereRaw($statusRaw . " NOT IN ('cuti','pensiun','nonaktif','resign')");
     }

@@ -1,10 +1,22 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { Toaster } from "@/components/ui/toaster"
 import { cn } from "@/lib/utils"
+import { prefetchUrl } from "@/lib/api"
+
+// URL yang dipanaskan segera setelah AdminLayout pertama kali mount (background)
+const WARMUP_URLS = [
+  "/api/pegawai?page=1&per_page=10",
+  "/api/pegawai?per_page=10",
+  "/api/pegawai?status=Cuti&per_page=1",
+  "/api/karir/naik-pangkat?page=1&per_page=10&near_years=1",
+  "/api/karir/satyalancana?page=1&per_page=10&near_years=1",
+  "/api/karir/summary?near_years=1",
+  "/api/karir/status-proses?page=1&per_page=10",
+]
 
 interface AdminLayoutProps {
   children: ReactNode
@@ -14,6 +26,12 @@ interface AdminLayoutProps {
 export function AdminLayout({ children, title }: AdminLayoutProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // Fallback warmup — jika user membuka halaman langsung tanpa melalui login
+  // (misal: buka tab baru dengan URL /pegawai secara langsung)
+  useEffect(() => {
+    WARMUP_URLS.forEach(prefetchUrl)
+  }, []) // hanya saat pertama mount
 
   return (
     <div className="min-h-screen bg-background">

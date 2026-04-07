@@ -11,12 +11,30 @@ import {
 } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { prefetchUrl } from "@/lib/api"
 
 interface SidebarProps {
   isCollapsed: boolean
   onToggle: () => void
   isMobileMenuOpen: boolean
   onMobileClose: () => void
+}
+
+// URL yang di-prefetch saat user hover pada nav link tertentu
+const NAV_PREFETCH: Record<string, string[]> = {
+  "/pegawai": [
+    "/api/pegawai?page=1&per_page=10",
+  ],
+  "/karir": [
+    "/api/karir/naik-pangkat?page=1&per_page=10&near_years=1",
+    "/api/karir/satyalancana?page=1&per_page=10&near_years=1",
+    "/api/karir/summary?near_years=1",
+    "/api/karir/status-proses?page=1&per_page=10",
+  ],
+  "/": [
+    "/api/pegawai?per_page=10",
+    "/api/pegawai?status=Cuti&per_page=1",
+  ],
 }
 
 const navItems = [
@@ -100,6 +118,13 @@ export function Sidebar({
               key={item.href}
               to={item.href}
               onClick={onMobileClose}
+              onMouseEnter={() => {
+                // Prefetch data halaman tujuan saat hover — sehingga saat klik sudah di cache
+                const urls = NAV_PREFETCH[item.href]
+                if (urls && !isActive) {
+                  urls.forEach(prefetchUrl)
+                }
+              }}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive

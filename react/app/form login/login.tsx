@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { setAuth, isAuthenticated } from "@/lib/auth";
+import { prefetchUrl } from "@/lib/api";
+
+// URL yang langsung dipanaskan begitu login berhasil
+const LOGIN_PREFETCH_URLS = [
+  "/api/pegawai?page=1&per_page=10",
+  "/api/pegawai?per_page=10",
+  "/api/pegawai?status=Cuti&per_page=1",
+  "/api/karir/naik-pangkat?page=1&per_page=10&near_years=1",
+  "/api/karir/satyalancana?page=1&per_page=10&near_years=1",
+  "/api/karir/summary?near_years=1",
+  "/api/karir/status-proses?page=1&per_page=10",
+]
 
 type TurnstileRenderOptions = {
   sitekey: string;
@@ -196,6 +208,9 @@ export default function LoginPage() {
 
       const json = await response.json();
       setAuth({ token: json.token, user: json.user });
+      // Mulai prefetch semua halaman utama SEBELUM navigate
+      // sehingga saat dashboard/pegawai render, data sudah ada di cache
+      LOGIN_PREFETCH_URLS.forEach(prefetchUrl);
       navigate("/");
     } catch (err: any) {
       const message =

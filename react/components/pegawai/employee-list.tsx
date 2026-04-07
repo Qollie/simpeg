@@ -14,9 +14,11 @@ import { Badge } from "@/components/ui/badge"
 import { Edit2, FileUp, Eye, Trash2, Clock } from "lucide-react"
 import type { Pegawai } from "@/lib/types"
 import { cn, calculateWorkDuration } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface EmployeeListProps {
   data: Pegawai[]
+  loading?: boolean
   onEdit: (pegawai: Pegawai) => void
   onUpload: (pegawai: Pegawai) => void
   onView: (pegawai: Pegawai) => void
@@ -29,13 +31,99 @@ const statusVariant = {
   Pensiun: "status-pensiun",
 }
 
+function SkeletonRow() {
+  return (
+    <TableRow className="border-border">
+      <TableCell className="py-4">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3 w-32" />
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <Skeleton className="h-3 w-36" />
+        </div>
+      </TableCell>
+      <TableCell className="py-4"><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell className="py-4">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+      </TableCell>
+      <TableCell className="py-4 text-center">
+        <div className="flex items-center justify-center gap-1">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+        </div>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <Card className="border-border p-4">
+      <div className="flex flex-col gap-3">
+        <div className="space-y-2">
+          <div className="flex items-start gap-2">
+            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-5 w-14 rounded-full" />
+          </div>
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-3 w-52" />
+          <Skeleton className="h-3 w-32" />
+        </div>
+        <div className="flex items-center justify-end gap-1">
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function EmployeeList({
   data,
+  loading = false,
   onEdit,
   onUpload,
   onView,
   onDelete,
 }: EmployeeListProps) {
+  // Pertama kali load (belum ada data) → tampilkan skeleton penuh
+  if (loading && data.length === 0) {
+    return (
+      <>
+        {/* Desktop Skeleton */}
+        <div className="hidden rounded-xl border border-border bg-card md:block">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-muted-foreground w-[400px]">Data Pegawai</TableHead>
+                <TableHead className="text-muted-foreground">Golongan</TableHead>
+                <TableHead className="text-muted-foreground">Status & Lama Kerja</TableHead>
+                <TableHead className="text-center text-muted-foreground">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
+            </TableBody>
+          </Table>
+        </div>
+        {/* Mobile Skeleton */}
+        <div className="space-y-3 md:hidden">
+          {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      </>
+    )
+  }
+
   if (data.length === 0) {
     return (
       <Card className="border-border p-8 text-center transition-all duration-300 hover:scale-[1.01] hover:shadow-lg">
@@ -46,8 +134,11 @@ export function EmployeeList({
     )
   }
 
+  // Ada data sebelumnya + loading → tampilkan data lama redup (keep previous data)
+  const dimmed = loading && data.length > 0
+
   return (
-    <>
+    <div className={cn("transition-opacity duration-200", dimmed && "pointer-events-none opacity-50")}>
       {/* Desktop Table */}
       <div className="hidden rounded-xl border border-border bg-card md:block">
         <Table>
@@ -227,6 +318,6 @@ export function EmployeeList({
           </Card>
         ))}
       </div>
-    </>
+    </div>
   )
 }

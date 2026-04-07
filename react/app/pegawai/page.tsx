@@ -19,7 +19,7 @@ import { AddEmployeeModal } from "@/components/pegawai/add-employee-modal"
 import { Button } from "@/components/ui/button"
 import { UserPlus, Users } from "lucide-react"
 import type { Pegawai, Dokumen } from "@/lib/types"
-import { apiFetch } from "@/lib/api"
+import { apiFetch, invalidateApiCache } from "@/lib/api"
 
 const apiBase = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") ?? ""
 
@@ -302,6 +302,7 @@ export default function PegawaiPage() {
       throw error
     }
 
+    invalidateApiCache('/api/pegawai')
     setReloadKey((v) => v + 1)
   }
 
@@ -319,6 +320,7 @@ export default function PegawaiPage() {
       throw new Error('Gagal mengubah dokumen')
     }
 
+    invalidateApiCache('/api/pegawai')
     setReloadKey((v) => v + 1)
   }
 
@@ -422,6 +424,7 @@ export default function PegawaiPage() {
       throw error
     }
 
+    invalidateApiCache('/api/pegawai')
     setReloadKey((v) => v + 1)
     setAddModal(false)
     toast({
@@ -448,6 +451,7 @@ export default function PegawaiPage() {
       }
     }
 
+    invalidateApiCache('/api/pegawai')
     setReloadKey((v) => v + 1)
   }
 
@@ -481,6 +485,7 @@ export default function PegawaiPage() {
       setPegawaiList((prev) =>
         prev.filter((p) => p.nipPegawai !== deleteDialog.pegawaiId)
       )
+      invalidateApiCache('/api/pegawai')
       setReloadKey((v) => v + 1)
 
       toast({
@@ -539,10 +544,11 @@ export default function PegawaiPage() {
         {/* Employee List */}
         <EmployeeList
           data={filteredPegawai}
+          loading={loadingData}
           onEdit={handleEdit}
           onUpload={handleEditDoc}
           onView={handleView}
-            onDelete={handleDeleteClick}
+          onDelete={handleDeleteClick}
         />
 
         {/* Pagination controls */}

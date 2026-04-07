@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Briefcase, Medal, Eye, TrendingUp, Loader2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Briefcase, Medal, Eye, TrendingUp } from "lucide-react"
 
 type KonteksKarir = "promosi" | "satyalancana"
 
@@ -107,6 +108,26 @@ function getInitials(nama: string): string {
     .join("") || "PG"
 }
 
+function SkeletonKarirItem() {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <Skeleton className="h-6 w-16 rounded-md" />
+        <Skeleton className="h-7 w-16 rounded-md" />
+      </div>
+    </div>
+  )
+}
+
 export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageChange, lihatDetail }: PropsKelayakanKenaikanPangkat) {
   const fallbackFoto = (nama: string, size = 160) =>
     `https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=random&size=${size}`
@@ -132,16 +153,15 @@ export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageCha
       <CardContent className="flex-1 overflow-hidden p-0">
         <ScrollArea className="h-full">
           <div className="space-y-3 px-4 pb-4 pt-2 md:px-6 md:pb-6">
-            {loading ? (
-              <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat data...
-              </div>
+            {loading && items.length === 0 ? (
+              Array.from({ length: 4 }).map((_, i) => <SkeletonKarirItem key={i} />)
             ) : items.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 Tidak ada pegawai yang memenuhi syarat saat ini.
               </p>
             ) : (
-              items.map((pegawai) => (
+              <div className={loading ? "pointer-events-none opacity-50 transition-opacity duration-200" : undefined}>
+              {items.map((pegawai) => (
                 <div
                   key={pegawai.nipPegawai}
                   className="flex items-start justify-between gap-3 rounded-lg border p-3 border-green-500/30 bg-green-500/5"
@@ -175,7 +195,8 @@ export function KelayakanKenaikanPangkat({ items, pagination, loading, onPageCha
                     </Button>
                   </div>
                 </div>
-              ))
+              ))}
+              </div>
             )}
           </div>
         </ScrollArea>
@@ -210,16 +231,15 @@ export function SatyalancanaKaryaSatya({ items, pagination, loading, onPageChang
       <CardContent className="flex-1 overflow-hidden p-0">
         <ScrollArea className="h-full">
           <div className="space-y-3 px-4 pb-4 pt-2 md:px-6 md:pb-6">
-            {loading ? (
-              <div className="flex h-48 items-center justify-center text-muted-foreground text-sm">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat data...
-              </div>
+            {loading && items.length === 0 ? (
+              Array.from({ length: 4 }).map((_, i) => <SkeletonKarirItem key={i} />)
             ) : items.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8 px-4">
                 Belum ada pegawai yang mendekati atau memenuhi milestone satyalancana.
               </p>
             ) : (
-              items.map((pegawai) => (
+              <div className={loading ? "pointer-events-none opacity-50 transition-opacity duration-200" : undefined}>
+              {items.map((pegawai) => (
                 <div
                   key={pegawai.nipPegawai}
                   className="flex items-start justify-between gap-3 rounded-lg border border-border/50 bg-secondary/30 p-3"
@@ -257,7 +277,8 @@ export function SatyalancanaKaryaSatya({ items, pagination, loading, onPageChang
                     </Button>
                   </div>
                 </div>
-              ))
+              ))}
+              </div>
             )}
           </div>
         </ScrollArea>

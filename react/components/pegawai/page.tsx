@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useDebounce } from "@/hooks/use-debounce"
+import { apiFetch, invalidateApiCache } from "@/lib/api"
 import { AdminLayout } from "@/components/layout/admin-layout"
 import {
   KelayakanKenaikanPangkat,
@@ -140,22 +142,24 @@ export default function KarirPage() {
   }>({ terbuka: false, pegawai: null, konteks: null })
   const [syncDialogOpen, setSyncDialogOpen] = useState(false)
 
+  const debouncedSearch = useDebounce(searchQuery, 350)
+
   useEffect(() => {
     setPromotionPage(1)
     setSatyaPage(1)
-  }, [searchQuery, satyaStatus, nearYears, perPage])
+  }, [debouncedSearch, satyaStatus, nearYears, perPage])
 
   useEffect(() => {
     let mounted = true
     const params = new URLSearchParams()
     params.set("page", String(promotionPage))
     params.set("per_page", perPage)
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
     params.set("near_years", nearYears)
 
     setPromotionLoading(true)
 
-    fetch(`/api/karir/naik-pangkat?${params.toString()}`)
+    apiFetch(`/api/karir/naik-pangkat?${params.toString()}`)
       .then((r) => r.json())
       .then((json) => {
         if (!mounted) return
@@ -224,20 +228,20 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [promotionPage, perPage, nearYears, searchQuery, promotionRefreshKey])
+  }, [promotionPage, perPage, nearYears, debouncedSearch, promotionRefreshKey])
 
   useEffect(() => {
     let mounted = true
     const params = new URLSearchParams()
     params.set("page", String(satyaPage))
     params.set("per_page", perPage)
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
     if (satyaStatus !== "semua") params.set("status", satyaStatus)
     params.set("near_years", nearYears)
 
     setSatyaLoading(true)
 
-    fetch(`/api/karir/satyalancana?${params.toString()}`)
+    apiFetch(`/api/karir/satyalancana?${params.toString()}`)
       .then((r) => r.json())
       .then((json) => {
         if (!mounted) return
@@ -260,18 +264,18 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [satyaPage, perPage, satyaStatus, nearYears, searchQuery])
+  }, [satyaPage, perPage, satyaStatus, nearYears, debouncedSearch])
 
   useEffect(() => {
     let mounted = true
     const params = new URLSearchParams()
     params.set("page", String(promotionPage))
     params.set("per_page", perPage)
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
 
     setProcessLoading(true)
 
-    fetch(`/api/karir/status-proses?${params.toString()}`)
+    apiFetch(`/api/karir/status-proses?${params.toString()}`)
       .then((r) => r.json())
       .then((json) => {
         if (!mounted) return
@@ -288,16 +292,16 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [promotionPage, perPage, searchQuery, processRefreshKey])
+  }, [promotionPage, perPage, debouncedSearch, processRefreshKey])
 
   useEffect(() => {
     let mounted = true
 
     const params = new URLSearchParams()
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
     params.set("near_years", nearYears)
 
-    fetch(`/api/karir/summary?${params.toString()}`)
+    apiFetch(`/api/karir/summary?${params.toString()}`)
       .then((r) => r.json())
       .then((json) => {
         if (!mounted) return
@@ -321,10 +325,10 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [searchQuery, nearYears, promotionRefreshKey])
+  }, [debouncedSearch, nearYears, promotionRefreshKey])
 
   const handleLihatDetail = (nip: string, konteks: "promosi" | "satyalancana") => {
-    fetch(`/api/pegawai/${nip}`)
+    apiFetch(`/api/pegawai/${nip}`)
       .then((r) => r.json())
       .then((json) => {
         const pegawai = mapPegawaiForModal(json)
@@ -341,7 +345,7 @@ export default function KarirPage() {
 
   const handleChangeProcessStatus = async (item: KarirProcessStatusItem, status: boolean) => {
     try {
-      const response = await fetch(`/api/karir/status-proses/${item.id}`, {
+      const response = await apiFetch(`/api/karir/status-proses/${item.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -354,6 +358,7 @@ export default function KarirPage() {
         throw new Error("Gagal memperbarui status proses")
       }
 
+      invalidateApiCache('/api/karir')
       setProcessRefreshKey((k) => k + 1)
       if (status) {
         setPromotionRefreshKey((k) => k + 1)
@@ -368,7 +373,7 @@ export default function KarirPage() {
       const params = new URLSearchParams()
       if (searchQuery.trim()) params.set("q", searchQuery.trim())
 
-      const response = await fetch(`/api/karir/status-proses/sync?${params.toString()}`, {
+      const response = await apiFetch(`/api/karir/status-proses/sync?${params.toString()}`, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -379,6 +384,7 @@ export default function KarirPage() {
         throw new Error("Gagal menyinkronkan data status proses")
       }
 
+      invalidateApiCache('/api/karir')
       setProcessRefreshKey((k) => k + 1)
       setPromotionRefreshKey((k) => k + 1)
       setSyncDialogOpen(false)
