@@ -20,8 +20,8 @@ class DatabaseSeeder extends Seeder
         \App\Models\User::firstOrCreate([
             'email' => 'test@example.com'
         ], [
-            'name' => 'Test User',
-            'password' => bcrypt('password')
+            'name' => 'Admin',
+            'password' => bcrypt('admin123')
         ]);
 
         $seeders = [

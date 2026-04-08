@@ -115,6 +115,7 @@ export default function KarirPage() {
 
   const [promotionPage, setPromotionPage] = useState(1)
   const [satyaPage, setSatyaPage] = useState(1)
+  const [processPage, setProcessPage] = useState(1)
   const [promotionRefreshKey, setPromotionRefreshKey] = useState(0)
   const [processRefreshKey, setProcessRefreshKey] = useState(0)
 
@@ -128,6 +129,7 @@ export default function KarirPage() {
   const [satyaPagination, setSatyaPagination] = useState<PaginationMeta>(DEFAULT_PAGINATION)
   const [processLoading, setProcessLoading] = useState(false)
   const [processItems, setProcessItems] = useState<KarirProcessStatusItem[]>([])
+  const [processPagination, setProcessPagination] = useState<PaginationMeta>(DEFAULT_PAGINATION)
   const [careerSummary, setCareerSummary] = useState({
     promotionTotal: 0,
     satyalancanaTotal: 0,
@@ -147,6 +149,7 @@ export default function KarirPage() {
   useEffect(() => {
     setPromotionPage(1)
     setSatyaPage(1)
+    setProcessPage(1)
   }, [debouncedSearch, satyaStatus, nearYears, perPage])
 
   useEffect(() => {
@@ -269,7 +272,7 @@ export default function KarirPage() {
   useEffect(() => {
     let mounted = true
     const params = new URLSearchParams()
-    params.set("page", String(promotionPage))
+    params.set("page", String(processPage))
     params.set("per_page", perPage)
     if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
 
@@ -280,10 +283,16 @@ export default function KarirPage() {
       .then((json) => {
         if (!mounted) return
         setProcessItems(json.data ?? [])
+        setProcessPagination({
+          currentPage: json.current_page ?? 1,
+          lastPage: json.last_page ?? 1,
+          total: json.total ?? 0,
+        })
       })
       .catch(() => {
         if (!mounted) return
         setProcessItems([])
+        setProcessPagination(DEFAULT_PAGINATION)
       })
       .finally(() => {
         if (mounted) setProcessLoading(false)
@@ -292,7 +301,7 @@ export default function KarirPage() {
     return () => {
       mounted = false
     }
-  }, [promotionPage, perPage, debouncedSearch, processRefreshKey])
+  }, [processPage, perPage, debouncedSearch, processRefreshKey])
 
   useEffect(() => {
     let mounted = true
@@ -502,7 +511,7 @@ export default function KarirPage() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="rounded-full border-border/70 bg-muted/40 px-2.5 py-1 text-[11px]">
-                {processItems.length} data
+                {processPagination.total} data
               </Badge>
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSyncDialogOpen(true)}>
                 Sync
@@ -584,6 +593,32 @@ export default function KarirPage() {
               </TableBody>
             </Table>
           </div>
+
+          {processPagination.lastPage > 1 && (
+            <div className="flex items-center justify-between border-t border-border/60 px-1 py-3 mt-2">
+              <p className="text-xs text-muted-foreground">
+                Halaman {processPagination.currentPage} dari {processPagination.lastPage}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={processLoading || processPagination.currentPage <= 1}
+                  onClick={() => setProcessPage((p) => Math.max(1, p - 1))}
+                >
+                  Sebelumnya
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={processLoading || processPagination.currentPage >= processPagination.lastPage}
+                  onClick={() => setProcessPage((p) => Math.min(processPagination.lastPage, p + 1))}
+                >
+                  Berikutnya
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

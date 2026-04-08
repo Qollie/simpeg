@@ -47,7 +47,7 @@ class PegawaiSeeder extends Seeder
 
         $dummyRows = [];
 
-        for ($i = 1; $i <= 36; $i++) {
+        for ($i = 1; $i <= 20; $i++) {
             $month = (($i - 1) % 12) + 1;
             $day = (($i - 1) % 28) + 1;
             $nip = sprintf('1985%02d%02d%010d', $month, $day, $i);

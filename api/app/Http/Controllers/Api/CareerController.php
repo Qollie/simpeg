@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\KarirStatusProses;
+use App\Models\Kepegawaian;
 use App\Models\Pangkat;
 use App\Models\Pegawai;
 use App\Models\RiwayatPangkat;
@@ -150,7 +151,8 @@ class CareerController extends Controller
                 'p.nama',
                 DB::raw("COALESCE(pg.pangkat || ' (' || pg.golongan || '/' || pg.ruang || ')', p.golongan) as golongan"),
             ])
-            ->whereRaw("LOWER(COALESCE(NULLIF(TRIM(p.\"status\"), ''), NULLIF(TRIM(k.\"statusPegawai\"), ''), 'aktif')) NOT IN ('cuti','pensiun','nonaktif','resign')");
+            ->whereRaw("LOWER(COALESCE(NULLIF(TRIM(p.\"status\"), ''), NULLIF(TRIM(k.\"statusPegawai\"), ''), 'aktif')) NOT IN ('cuti','pensiun','nonaktif','resign')")
+            ->whereRaw("LOWER(TRIM(COALESCE(k.\"statusPegawai\", ''))) = 'pns'");
 
         $query = DB::table('KarirStatusProses as ks')
             ->joinSub($pegawaiSub, 'b', 'b.nipPegawai', '=', 'ks.nipPegawai')
@@ -210,6 +212,15 @@ class CareerController extends Controller
             'status' => ['required', 'boolean'],
         ]);
 
+        // PPPK dan Non-ASN tidak memiliki sistem kenaikan pangkat
+        $statusItemCheck = KarirStatusProses::query()->findOrFail($id);
+        $kepegawaianCheck = Kepegawaian::query()->where('nipKepegawaian', $statusItemCheck->nipPegawai)->first();
+        if (strtolower(trim($kepegawaianCheck->statusPegawai ?? '')) !== 'pns') {
+            return response()->json([
+                'message' => 'Kenaikan pangkat hanya berlaku untuk pegawai berstatus PNS.',
+            ], 422);
+        }
+
         $result = DB::transaction(function () use ($id, $validated) {
             $statusItem = KarirStatusProses::query()->lockForUpdate()->findOrFail($id);
             $pegawai = Pegawai::query()->findOrFail($statusItem->nipPegawai);
@@ -223,10 +234,11 @@ class CareerController extends Controller
 
             // Hanya naik pangkat jika baru pertama kali diproses (bukan update ulang)
             if ($validated['status'] === true && !$sudahDiprosesBefore) {
-                // Ambil riwayat pangkat terakhir
+                // Ambil riwayat pangkat terakhir (pakai idRiwayat agar tetap deterministik
+                // meski beberapa siklus diproses pada hari yang sama)
                 $latestRiwayat = RiwayatPangkat::query()
                     ->where('nipRiwayat', $statusItem->nipPegawai)
-                    ->orderByDesc('tmtPangkat')
+                    ->orderByDesc('idRiwayat')
                     ->first();
 
                 // Cari pangkat saat ini dari riwayat, atau dari kolom golongan di Pegawai.
@@ -395,6 +407,7 @@ class CareerController extends Controller
                 DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.\"tmtGolonganAktif\"::date))::int as \"masaKerjaGolonganBulan\""),
                 DB::raw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date as \"eligibleDate\""),
             ])
+            ->where('b.statusPegawai', 'pns')
             ->whereNotNull('b.tmtGolonganAktif')
             ->whereRaw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date <= CURRENT_DATE")
             ->whereNotExists(function ($sub) {
@@ -435,6 +448,9 @@ class CareerController extends Controller
                 DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.\"tanggalMasuk\"::date))::int as \"masaKerjaTahun\""),
                 DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.\"tanggalMasuk\"::date))::int as \"masaKerjaBulan\""),
             ])
+            // Non-ASN tidak berhak atas Satyalancana Karya Satya (bukan bagian ASN formal)
+            // PNS dan PPPK sama-sama berhak (PPPK adalah ASN per UU No. 5/2014)
+            ->where('b.statusPegawai', '<>', 'non-asn')
             ->whereNotNull('b.tanggalMasuk');
 
         $withStatus = DB::query()->fromSub($withTenure, 't')
@@ -536,6 +552,7 @@ class CareerController extends Controller
                 ) as \"tmtGolonganAktif\""),
                 DB::raw("COALESCE(p.\"tanggalMasuk\", k.\"tmtPns\", k.\"tmtPppk\", k.\"tmtCpns\") as \"tanggalMasuk\""),
                 DB::raw($this->rankCaseExpression("COALESCE(pg.pangkat || ' (' || pg.golongan || '/' || pg.ruang || ')', p.golongan)") . ' as "rankOrder"'),
+                DB::raw("LOWER(TRIM(COALESCE(k.\"statusPegawai\", ''))) as \"statusPegawai\""),
             ])
             ->whereRaw($statusRaw . " NOT IN ('cuti','pensiun','nonaktif','resign')");
     }
@@ -550,6 +567,7 @@ class CareerController extends Controller
                 'b.tmtGolonganAktif',
                 'b.rankOrder',
             ])
+            ->where('b.statusPegawai', 'pns')
             ->whereNotNull('b.tmtGolonganAktif')
             ->where(function ($sub) use ($maxRankOrder) {
                 $sub->where('b.rankOrder', 0)
