@@ -165,6 +165,18 @@ class CareerController extends Controller
                 'ks.cycleNumber',
                 'ks.tmtGolonganDasar',
                 'ks.eligibleDate',
+                // Prioritas: kolom baru → fallback scalar subquery dari RiwayatPangkat yang ditutup (LIMIT 1 agar tidak duplikat)
+                DB::raw('COALESCE(ks."golonganSebelum", (
+                    SELECT pg_hist.pangkat || \' (\' || pg_hist.golongan || \'/\' || pg_hist.ruang || \')\'
+                    FROM "RiwayatPangkat" rp_hist
+                    JOIN "Pangkat" pg_hist ON pg_hist."idPangkat" = rp_hist."idPangkatRiwayat"
+                    WHERE rp_hist."nipRiwayat" = ks."nipPegawai"
+                      AND rp_hist."tmtSelesai" = ks."processedAt"
+                      AND rp_hist.status = false
+                      AND rp_hist."tmtSelesai" IS NOT NULL
+                    ORDER BY rp_hist."idRiwayat" DESC
+                    LIMIT 1
+                )) as "golonganSebelum"'),
                 'ks.status',
                 'ks.processedAt',
             ])
@@ -190,6 +202,7 @@ class CareerController extends Controller
             'nipPegawai'       => $row->nipPegawai,
             'nama'             => $row->nama,
             'golongan'         => $row->golongan,
+            'golonganSebelum'  => $row->golonganSebelum ?? null,
             'cycleNumber'      => (int) $row->cycleNumber,
             'tmtGolonganDasar' => $row->tmtGolonganDasar,
             'eligibleDate'     => $row->eligibleDate,
@@ -230,7 +243,7 @@ class CareerController extends Controller
 
             $statusItem->status = $validated['status'];
             $statusItem->processedAt = $validated['status'] ? $today : null;
-            $statusItem->save();
+            // save() dipanggil setelah golonganSebelum diisi di blok promosi
 
             // Hanya naik pangkat jika baru pertama kali diproses (bukan update ulang)
             if ($validated['status'] === true && !$sudahDiprosesBefore) {
@@ -250,8 +263,17 @@ class CareerController extends Controller
                         ->first();
 
                 if (!$currentPangkat) {
+                    $statusItem->save();
                     return ['statusItem' => $statusItem, 'golongan' => $pegawai->golongan, 'naik' => false];
                 }
+
+                // Simpan pangkat sebelum promosi sebagai histori
+                $statusItem->golonganSebelum = sprintf(
+                    '%s (%s/%s)',
+                    $currentPangkat->pangkat,
+                    $currentPangkat->golongan,
+                    $currentPangkat->ruang
+                );
 
                 $nextPangkat = Pangkat::query()
                     ->where('urutan', $currentPangkat->urutan + 1)
@@ -259,6 +281,7 @@ class CareerController extends Controller
 
                 // Sudah di pangkat tertinggi, tidak perlu naik
                 if (!$nextPangkat) {
+                    $statusItem->save();
                     return ['statusItem' => $statusItem, 'golongan' => $pegawai->golongan, 'naik' => false];
                 }
 
@@ -283,24 +306,30 @@ class CareerController extends Controller
                 $pegawai->golongan = $newGolongan;
                 $pegawai->save();
 
+                // Simpan statusItem setelah semua field siap
+                $statusItem->save();
+
                 return ['statusItem' => $statusItem, 'golongan' => $newGolongan, 'naik' => true];
             }
 
-            // Jika kembali ke false, ambil golongan terkini dari DB
+            // Jika kembali ke false, bersihkan golonganSebelum dan simpan
+            $statusItem->golonganSebelum = null;
+            $statusItem->save();
             $pegawai->refresh();
             return ['statusItem' => $statusItem, 'golongan' => $pegawai->golongan, 'naik' => false];
         });
 
         return response()->json([
-            'id'         => $result['statusItem']->id,
-            'nipPegawai' => $result['statusItem']->nipPegawai,
-            'cycleNumber' => (int) $result['statusItem']->cycleNumber,
+            'id'              => $result['statusItem']->id,
+            'nipPegawai'      => $result['statusItem']->nipPegawai,
+            'cycleNumber'     => (int) $result['statusItem']->cycleNumber,
             'tmtGolonganDasar' => optional($result['statusItem']->tmtGolonganDasar)->toDateString(),
-            'eligibleDate' => optional($result['statusItem']->eligibleDate)->toDateString(),
-            'status'     => (bool) $result['statusItem']->status,
-            'golongan'   => $result['golongan'],
-            'naik'       => $result['naik'],
-            'processedAt' => optional($result['statusItem']->processedAt)->toDateString(),
+            'eligibleDate'    => optional($result['statusItem']->eligibleDate)->toDateString(),
+            'golonganSebelum' => $result['statusItem']->golonganSebelum,
+            'status'          => (bool) $result['statusItem']->status,
+            'golongan'        => $result['golongan'],
+            'naik'            => $result['naik'],
+            'processedAt'     => optional($result['statusItem']->processedAt)->toDateString(),
         ]);
     }
 
@@ -403,19 +432,66 @@ class CareerController extends Controller
                 'b.jabatan',
                 'b.golongan',
                 'b.tmtGolonganAktif',
-                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, b.\"tmtGolonganAktif\"::date))::int as \"masaKerjaGolonganTahun\""),
-                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, b.\"tmtGolonganAktif\"::date))::int as \"masaKerjaGolonganBulan\""),
-                DB::raw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date as \"eligibleDate\""),
+                // Masa kerja dihitung dari tmtGolonganDasar siklus tertunggak jika ada,
+                // fallback ke tmtGolonganAktif saat ini (untuk pegawai yang belum pernah diproses).
+                DB::raw("EXTRACT(YEAR FROM age(CURRENT_DATE, COALESCE(
+                    (SELECT ks_mk.\"tmtGolonganDasar\" FROM \"KarirStatusProses\" ks_mk
+                     WHERE ks_mk.\"nipPegawai\" = b.\"nipPegawai\"
+                       AND ks_mk.status = false
+                       AND ks_mk.\"eligibleDate\" IS NOT NULL
+                       AND ks_mk.\"eligibleDate\"::date <= CURRENT_DATE
+                       AND ks_mk.\"tmtGolonganDasar\" IS NOT NULL
+                     ORDER BY ks_mk.\"eligibleDate\" ASC
+                     LIMIT 1),
+                    b.\"tmtGolonganAktif\"
+                )::date))::int as \"masaKerjaGolonganTahun\""),
+                DB::raw("EXTRACT(MONTH FROM age(CURRENT_DATE, COALESCE(
+                    (SELECT ks_mk.\"tmtGolonganDasar\" FROM \"KarirStatusProses\" ks_mk
+                     WHERE ks_mk.\"nipPegawai\" = b.\"nipPegawai\"
+                       AND ks_mk.status = false
+                       AND ks_mk.\"eligibleDate\" IS NOT NULL
+                       AND ks_mk.\"eligibleDate\"::date <= CURRENT_DATE
+                       AND ks_mk.\"tmtGolonganDasar\" IS NOT NULL
+                     ORDER BY ks_mk.\"eligibleDate\" ASC
+                     LIMIT 1),
+                    b.\"tmtGolonganAktif\"
+                )::date))::int as \"masaKerjaGolonganBulan\""),
+                // Prioritas: tanggal layak dari KarirStatusProses yang belum diproses (siklus tertunggak),
+                // fallback ke kalkulasi tmtGolonganAktif + 4 tahun untuk pegawai baru masuk daftar.
+                DB::raw("COALESCE(
+                    (SELECT MIN(ks_ed.\"eligibleDate\") FROM \"KarirStatusProses\" ks_ed
+                     WHERE ks_ed.\"nipPegawai\" = b.\"nipPegawai\"
+                       AND ks_ed.status = false
+                       AND ks_ed.\"eligibleDate\" IS NOT NULL
+                       AND ks_ed.\"eligibleDate\"::date <= CURRENT_DATE),
+                    (b.\"tmtGolonganAktif\"::date + interval '4 years')::date
+                ) as \"eligibleDate\""),
             ])
             ->where('b.statusPegawai', 'pns')
             ->whereNotNull('b.tmtGolonganAktif')
-            ->whereRaw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date <= CURRENT_DATE")
-            ->whereNotExists(function ($sub) {
-                $sub->select(DB::raw(1))
-                    ->from('KarirStatusProses as ks')
-                    ->whereColumn('ks.nipPegawai', 'b.nipPegawai')
-                    ->whereRaw("ks.\"eligibleDate\" = (b.\"tmtGolonganAktif\"::date + interval '4 years')::date")
-                    ->where('ks.status', true);
+            ->where(function ($outer) {
+                // Kondisi 1: berdasarkan tmtGolonganAktif saat ini (belum ada siklus yang diproses untuk tanggal ini)
+                $outer->where(function ($inner) {
+                    $inner->whereRaw("(b.\"tmtGolonganAktif\"::date + interval '4 years')::date <= CURRENT_DATE")
+                          ->whereNotExists(function ($sub) {
+                              $sub->select(DB::raw(1))
+                                  ->from('KarirStatusProses as ks')
+                                  ->whereColumn('ks.nipPegawai', 'b.nipPegawai')
+                                  ->whereRaw("ks.\"eligibleDate\" = (b.\"tmtGolonganAktif\"::date + interval '4 years')::date")
+                                  ->where('ks.status', true);
+                          });
+                })
+                // Kondisi 2: ada siklus KarirStatusProses yang belum diproses dengan eligibleDate sudah lewat
+                // (terjadi ketika tmtGolonganAktif diperbarui setelah siklus sebelumnya diproses,
+                //  sehingga siklus lama yang tertunggak tidak terdeteksi dari tmtGolonganAktif baru)
+                ->orWhereExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('KarirStatusProses as ks_pending')
+                        ->whereColumn('ks_pending.nipPegawai', 'b.nipPegawai')
+                        ->where('ks_pending.status', false)
+                        ->whereNotNull('ks_pending.eligibleDate')
+                        ->whereRaw('ks_pending."eligibleDate"::date <= CURRENT_DATE');
+                });
             })
             ->where(function ($sub) use ($maxRankOrder) {
                 $sub->where('b.rankOrder', 0)

@@ -13,6 +13,7 @@ class KarirStatusProses extends Model
         'cycleNumber',
         'tmtGolonganDasar',
         'eligibleDate',
+        'golonganSebelum',
         'status',
         'processedAt',
     ];

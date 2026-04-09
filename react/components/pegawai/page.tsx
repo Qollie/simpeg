@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { TrendingUp } from "lucide-react"
 
 const DEFAULT_PAGINATION: PaginationMeta = {
   currentPage: 1,
@@ -53,6 +54,7 @@ type KarirProcessStatusItem = {
   nipPegawai: string
   nama: string
   golongan: string | null
+  golonganSebelum: string | null
   cycleNumber: number
   tmtGolonganDasar: string | null
   eligibleDate: string | null
@@ -480,9 +482,14 @@ export default function KarirPage() {
               <p className="text-sm font-semibold">{careerSummary.satyalancanaMendekati}</p>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {/* Tombol unduh CSV dihapus sesuai permintaan */}
-          </div>
+            {careerSummary.promotionTotal > 0 && (
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 dark:border-green-800 dark:bg-green-900/20">
+              <TrendingUp className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+              <p className="text-xs text-green-700 dark:text-green-400">
+                <span className="font-semibold">{careerSummary.promotionTotal} pegawai</span> layak naik pangkat dan perlu segera diproses.
+              </p>
+            </div>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">{summaryText}</p>
         </div>
 
@@ -549,7 +556,16 @@ export default function KarirPage() {
                     <TableRow key={item.id} className="transition-colors hover:bg-muted/25">
                       <TableCell className="font-mono text-[12px]">{item.nipPegawai}</TableCell>
                       <TableCell className="font-medium">{item.nama}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{item.golongan ?? "-"}</TableCell>
+                      <TableCell className="text-xs">
+                        {item.status && item.golonganSebelum ? (
+                          <div className="space-y-0.5">
+                            <p className="text-green-600 font-medium">{item.golongan ?? "-"}</p>
+                            <p className="text-muted-foreground line-through">{item.golonganSebelum}</p>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">{item.golongan ?? "-"}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">
                         <div className="space-y-1">
                           <p className="font-medium text-foreground">Siklus {item.cycleNumber}</p>
