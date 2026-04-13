@@ -1,0 +1,72 @@
+services:
+  # ── PostgreSQL Database ────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: simpeg1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # ── Laravel API (PHP-FPM) ──────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:PR60b3jzZGRrboN/DILeIDM2WqdcPn8hd1a+33Ls1Ok=
+      APP_DEBUG: "true"
+      APP_URL: http://localhost
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: simpeg1
+      DB_USERNAME: postgres
+      DB_PASSWORD: secret
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      TURNSTILE_SITE_KEY: 0x4AAAAAACoIyTwvzKikiBNm
+      TURNSTILE_SECRET_KEY: 0x4AAAAAACoIycs4ogVTWONwtOl4mIEpKMg
+    volumes:
+      - ./api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+
+  # ── React Frontend (Vite dev server) ───────────────────
+  frontend:
+    build:
+      context: ./react
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./react:/app
+      - react_node_modules:/app/node_modules
+    environment:
+      VITE_API_TARGET: http://api:8000
+      VITE_TURNSTILE_SITE_KEY: 0x4AAAAAACoIyTwvzKikiBNm
+
+  # ── Nginx Reverse Proxy ────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+      - frontend
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./api/public:/var/www/html/public
+
+volumes:
+  pgdata:
+  api_vendor:
+  react_node_modules:
